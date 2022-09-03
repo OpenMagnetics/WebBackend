@@ -1,0 +1,16 @@
+flask
+flask_wtf
+python-dotenv
+psycopg2-binary
+sqlalchemy
+pandas
+numpy
+overpy
+gunicorn
+bootstrap-flask
+flask-login
+bcrypt
+email-validator
+pydantic
+supervisor
+requests
