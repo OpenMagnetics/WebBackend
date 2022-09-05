@@ -13,15 +13,32 @@ import shutil
 import time
 
 
-def get_ip_location(ip_address):
-    url = f'https://ipinfo.io/[{ip_address}]/json'
-    response = urlopen(url)
-    metadata = json.load(response)
-    return metadata
-
-
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/index', methods=['GET', 'POST'])
 def index():
     return render_template("index.html")
 
+
+@app.route('/musings', methods=['GET', 'POST'])
+def musings():
+    return render_template('musings.html')
+
+
+@app.route('/musings1', methods=['GET', 'POST'])
+def musings1():
+    return render_template('musings/musings1.html')
+
+
+@app.route('/musings2', methods=['GET', 'POST'])
+def musings2():
+    return render_template('musings/musings2.html')
+
+
+@app.route('/musings3', methods=['GET', 'POST'])
+def musings3():
+    return render_template('musings/musings3.html')
+
+
+@app.route('/musings5', methods=['GET', 'POST'])
+def musings5():
+    return render_template('musings/musings5.html')
