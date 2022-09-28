@@ -7,18 +7,18 @@
         <div class="container" >
             <div class="row justify-content-center">
                 <div class="col-md-9 ">
-                    <h1 class="text-light">Alf’s Musings #1</h1>
+                    <h1 class="text-white">Alf’s Musings #1</h1>
                     <div class="user d-flex align-items-start justify-content-between bg-secondary p-4 rounded">
                         <div class="d-flex align-items-start">
                             <img src="./img/kajal.png" class="img-fluid rounded-circle" alt="">
                             <div class="d-block">
-                                <span class="d-block text-light">by <a class="h6" >Alfonso Martínez</a></span>
+                                <span class="d-block text-white">by <a class="h6" >Alfonso Martínez</a></span>
                                 <span class="d-block text-muted">7th Dec 2021</span>
                             </div>
                         </div>
                     </div>
                     <!--//blog section-->
-                    <div class="blog-section text-light">
+                    <div class="blog-section text-white">
                         <p>It is 1966. The Vietnam War is raging while the hippie movement grows. My beloved Doors record their <a href="https://www.youtube.com/watch?v=w6LiHXsBmmA">first album</a>, while Sinatra and Cash are collecting everything not taken by the Beach Boys. Walt Disney <s><a href="https://www.bbc.com/culture/article/20190426-was-walt-disney-frozen-after-death">gets cryogenized</a></s> dies. Electric appliances are arriving in American kitchens, and a weird series called Star Trek is debuting on TV. Europe looks worried at the 23rd Congress of the Communist Party of the Soviet Union, while in Berlin people can cross the Wall to celebrate Christmas.</p>
                         <p>But for us Engineers, something else happened in Denmark in 1966: P. L. Dowell published his famous paper “Effects of eddy currents in transformer windings”. And I can assure you I see more people infatuated as of today with his equations than with The Doors.</p>
                         <p>So I have decided to dedicate my first and only number (for now) in a series of Alf’s Musings to P. L. Dowell. Concretely to why you shouldn’t use Dowell’s method to design your transformers.</p>
@@ -63,7 +63,7 @@
                         <p>The problem comes in the second part, when he continues his reasoning trying to calculate the AC resistance of a magnetic. All the calculations in this section are based on a continuously increasing MMF (as in an inductor or non-interleaved transformer) to extract his famous equations. So the moment you have a different case, e. g. an uneven number of layers in one winding and even in the other, applying this method would be wrong.</p>
                         <p>Sure, that is not such a common case, but I haven’t finished yet, there are a few more pitfalls!</p>
                         <img src="/static/images/musings/1/image1.png" class="img-fluid bounce-little my-3" alt="">
-                        <p class="p">Sadly originally published in https://drmolina.substack.com/p/4-deep-tech-projects-and-alfs-musings</p>
+                        <p class="p">Regretfully originally published in https://drmolina.substack.com/p/4-deep-tech-projects-and-alfs-musings</p>
                     </div>
                 </div>
             </div>
@@ -71,7 +71,8 @@
 
         <!-- FOOTER -->
         <footer class="container navbar fixed-bottom">
-            <p class="float-right"><a href="#">Back to top</a></p>
+            <p class="float-left"><a href="#">Back to top</a></p>
+            <p class="float-right"><a href="/musings">Back to menu</a></p>
         </footer>
     </main>
 {% endblock %}

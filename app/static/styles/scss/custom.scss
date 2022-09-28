@@ -1,10 +1,12 @@
-$primary:       #ff1e00 !default;
-$danger:        #290500 !default;
-$secondary:     #1d1313 !default;
-$light:     	#718191 !default;
-$white:     	#F5F0F6 !default;
-$dark:     		#000000 !default;
-$success: 		#61A888 !default;
+$light:     	#2a2a2a !default;
+$white:     	#d4d4d4 !default;
+$dark:     		#1a1a1a !default;
+$primary:       #539796 !default;
+$secondary:     #005f48 !default;
+$info:        	#b18aea !default;
+$success:       #529400 !default;
+$warning:       #ffb94e !default;
+$danger:        #ff8800 !default;
 
 $popover-bg:                        $dark !default;
 
@@ -12,4 +14,5 @@ $popover-body-color:                $white !default;
 $enable-responsive-font-sizes: 		true;
 
 
-@import "./bootstrap-4.5.3/scss/bootstrap";
+@import "./bootstrap-5.2.1/scss/bootstrap";
+

@@ -21,10 +21,15 @@
         </script>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        <link rel="stylesheet" type="text/css" href="/static/styles/css/custom.css">
         <script src="https://code.jquery.com/jquery-3.6.0.js" crossorigin="anonymous"></script>
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+        <link rel="stylesheet" type="text/css" href="/static/styles/css/custom.css">
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.1/dist/js/bootstrap.bundle.min.js" integrity="sha384-u1OknCvxWvY5kfmNBILK2hRnQC3Pr17a+RTT6rIHI7NnikvbZlHgTPOOmMi466C8" crossorigin="anonymous"></script>
+
         <script src="https://kit.fontawesome.com/d5a40d6941.js" crossorigin="anonymous"></script>
+        <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+        <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+        <script type="importmap">{"imports": {"vue": "https://cdnjs.cloudflare.com/ajax/libs/vue/3.2.37/vue.esm-browser.min.js"}}</script>
         <title>Open Magnetics</title>
         <!-- <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico"> -->
         {% block head %}{% endblock %}
@@ -35,7 +40,8 @@
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MVGMH67"
         height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <!-- End Google Tag Manager (noscript) -->
-        <nav class="navbar navbar-expand-lg navbar-dark bg-secondary text-primary mb-2", id="header_wrapper">
+
+        <nav class="navbar navbar-expand-lg navbar-dark bg-light text-primary mb-2", id="header_wrapper">
             <a href="/index">
                 <img src="/static/images/logo.png" width="40" height="auto" href="/index" class="d-inline-block align-top mr-2" alt="">
             </a>
@@ -46,9 +52,12 @@
 
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
                 <ul class="navbar-nav mr-auto">
-<!--                     <li class="nav-item">
+                    <li class="nav-item">
+                        <a class="nav-link text-primary" href="/roadmap">Roadmap</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link text-primary" href="/musings">Alf's Musings</a>
-                    </li> -->
+                    </li>
                 </ul>
                 <ul class="navbar-nav user_section">
                 </ul>
@@ -68,52 +77,52 @@
         }
 
         body {
-            background-color: var(--dark);
+            background-color: var(--bs-dark) !important;
         }
         .border-dark {
-            border-color: var(--dark) !important;
+            border-color: var(--bs-dark) !important;
         }
         .input-group-text{
-            background-color: var(--light) !important;
-            color: var(--white) !important;
-            border-color: var(--dark) !important;
+            background-color: var(--bs-light) !important;
+            color: var(--bs-white) !important;
+            border-color: var(--bs-dark) !important;
         }
         .custom-select,
-        .card,
         .form-control {
-            background-color: var(--dark) !important;
-            color: var(--white) !important;
-            border-color: var(--dark) !important;
+            background-color: var(--bs-dark) !important;
+            color: var(--bs-white) !important;
+            border-color: var(--bs-dark) !important;
+        }
+        .jumbotron{
+            border-radius: 1em;
+            box-shadow: 0 5px 10px rgba(0,0,0,.2);
+        }
+        .card{
+            padding: 1.5em .5em .5em;
+            background-color: var(--bs-light);
+            border-radius: 1em;
+            text-align: center;
+            box-shadow: 0 5px 10px rgba(0,0,0,.2);
         }
         .form-control:disabled {
-            background-color: var(--dark) !important;
-            color: var(--white) !important;
-            border-color: var(--dark) !important;
+            background-color: var(--bs-dark) !important;
+            color: var(--bs-white) !important;
+            border-color: var(--bs-dark) !important;
         }
         .form-control:-webkit-autofill,
         .form-control:-webkit-autofill:focus,
         .form-control:-webkit-autofill{
-            -webkit-text-fill-color: var(--white) !important;
+            -webkit-text-fill-color: var(--bs-white) !important;
             background-color: transparent !important;
-            -webkit-box-shadow: 0 0 0 50px var(--dark) inset;
-        }
-        html {
-          scrollbar-face-color: var(--secondary);
-          scrollbar-base-color: var(--secondary);
-          scrollbar-3dlight-color: var(--secondary);
-          scrollbar-highlight-color: var(--secondary);
-          scrollbar-track-color: var(--dark);
-          scrollbar-arrow-color: var(--dark);
-          scrollbar-shadow-color: var(--secondary);
-          scrollbar-dark-shadow-color: var(--secondary);
+            -webkit-box-shadow: 0 0 0 50px var(--bs-dark) inset;
         }
 
         ::-webkit-scrollbar { height: 3px;}
-        ::-webkit-scrollbar-button {  background-color: var(--secondary); }
-        ::-webkit-scrollbar-track {  background-color: var(--secondary);}
-        ::-webkit-scrollbar-track-piece { background-color: var(--dark);}
-        ::-webkit-scrollbar-thumb {  background-color: var(--secondary); border-radius: 3px;}
-        ::-webkit-scrollbar-corner { background-color: var(--secondary);}}
+        ::-webkit-scrollbar-button {  background-color: var(--bs-light); }
+        ::-webkit-scrollbar-track {  background-color: var(--bs-light);}
+        ::-webkit-scrollbar-track-piece { background-color: var(--bs-dark);}
+        ::-webkit-scrollbar-thumb {  background-color: var(--bs-light); border-radius: 3px;}
+        ::-webkit-scrollbar-corner { background-color: var(--bs-light);}
     </style>
 
     {% block scripts %}{% endblock %}
@@ -121,9 +130,6 @@
         $(document).ready(function() {
             $('[data-toggle="popover"]').popover();
             $('[data-toggle="tooltip"]').tooltip();
-
-            $(".user_section").html(right_html)
-
         });
     </script>
 </html>

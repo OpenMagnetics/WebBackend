@@ -1,5 +1,6 @@
 flask
 flask_wtf
+flask_sqlalchemy
 python-dotenv
 psycopg2-binary
 sqlalchemy
