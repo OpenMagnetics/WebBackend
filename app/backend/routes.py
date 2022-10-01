@@ -72,3 +72,13 @@ def get_all_number_votes():
     print(number_votes)
     number_votes = number_votes.to_dict('records')
     return make_response(json.dumps(number_votes))
+
+
+@app.route('/cookie_policy', methods=['GET'])
+def cookie_policy():
+    return render_template('cookie_policy.html')
+
+
+@app.route('/legal_notice', methods=['GET'])
+def legal_notice():
+    return render_template('legal_notice.html')
