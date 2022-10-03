@@ -1,17 +1,16 @@
 import sqlalchemy
 import pandas
 from sqlalchemy.ext.automap import automap_base
-from flask_login import UserMixin
 import bcrypt
 import os
-import datetime
 from pydantic import BaseModel
 from typing import Optional, Union, List
-from app import app
+from app import config
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Date, Integer, String, Table, MetaData
 import sqlite3
 import shutil
+from tornado.options import options
 
 
 class Vote(BaseModel):
@@ -50,12 +49,11 @@ class Database:
 
 class RoadmapVotesTable(Database):
     def connect(self, schema='public'):
-        path = os.path.join(app.config['LOCAL_DB_PATH'], app.config['LOCAL_DB_FILENAME'])
-        os.makedirs(app.config['LOCAL_DB_PATH'], exist_ok=True)
+        path = os.path.join(options['LOCAL_DB_PATH'], options['LOCAL_DB_FILENAME'])
+        os.makedirs(options['LOCAL_DB_PATH'], exist_ok=True)
         
         Base = declarative_base()
-        print(f'sqlite:///{path}')
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}', echo=True)
+        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
 
         metadata = MetaData()
         Table(
