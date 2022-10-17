@@ -1,2 +1,3 @@
-# Web
-This repository holds the code of the openmagnetics.com web. At the moment of this writing, it is thought to be done in Flask and Vue
+# WebBackend
+
+This project holds the code of the openmagnetics.com web backend, written in Tornado. 
