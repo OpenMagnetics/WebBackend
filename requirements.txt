@@ -3,7 +3,7 @@ pandas
 numpy
 pydantic
 supervisor
-tornado
+fastapi
 bcrypt
 pymongo[srv]
 psycopg2-binary

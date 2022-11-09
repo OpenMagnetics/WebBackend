@@ -6,7 +6,6 @@ import os
 from pydantic import BaseModel
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, Table, MetaData
-from tornado.options import options
 import datetime
 from typing import List, Optional, Any, Union
 from enum import Enum
@@ -138,11 +137,11 @@ class UsersTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"
-        address = options['OM_USERS_DB_ADDRESS']
-        port = options['OM_USERS_DB_PORT']
-        name = options['OM_USERS_DB_NAME']
-        user = options['OM_USERS_DB_USER']
-        password = options['OM_USERS_DB_PASSWORD']
+        address = os.getenv('OM_USERS_DB_ADDRESS')
+        port = os.getenv('OM_USERS_DB_PORT')
+        name = os.getenv('OM_USERS_DB_NAME')
+        user = os.getenv('OM_USERS_DB_USER')
+        password = os.getenv('OM_USERS_DB_PASSWORD')
 
         self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
 
@@ -242,8 +241,8 @@ class UsersTable(Database):
 
 class RoadmapVotesTable(Database):
     def connect(self, schema='public'):
-        path = os.path.join(options['LOCAL_DB_PATH'], options['LOCAL_DB_FILENAME'])
-        os.makedirs(options['LOCAL_DB_PATH'], exist_ok=True)
+        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
+        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
         
         Base = declarative_base()
         self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
@@ -314,8 +313,8 @@ class RoadmapVotesTable(Database):
 
 class OperationPointSlugsTable(Database):
     def connect(self, schema='public'):
-        path = os.path.join(options['LOCAL_DB_PATH'], options['LOCAL_DB_FILENAME'])
-        os.makedirs(options['LOCAL_DB_PATH'], exist_ok=True)
+        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
+        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
         
         Base = declarative_base()
         self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
@@ -371,10 +370,10 @@ class OperationPointSlugsTable(Database):
 class OperationPointsTable(Database):
 
     def connect(self, schema='public'):
-        driver = options['OM_OPERATION_POINTS_DB_DRIVER']
-        address = options['OM_OPERATION_POINTS_DB_ADDRESS']
-        user = options['OM_OPERATION_POINTS_DB_USER']
-        password = options['OM_OPERATION_POINTS_DB_PASSWORD']
+        driver = os.getenv('OM_OPERATION_POINTS_DB_DRIVER')
+        address = os.getenv('OM_OPERATION_POINTS_DB_ADDRESS')
+        user = os.getenv('OM_OPERATION_POINTS_DB_USER')
+        password = os.getenv('OM_OPERATION_POINTS_DB_PASSWORD')
 
         # self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
         self.session = MongoClient(f"{driver}://{user}:{password}@{address}/")
