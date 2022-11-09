@@ -5,3 +5,4 @@ pydantic
 supervisor
 tornado
 bcrypt
+pymongo[srv]
