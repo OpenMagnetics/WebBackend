@@ -21,10 +21,10 @@ tornado.options.define("OM_OPERATION_POINTS_DB_ADDRESS", default='openmagnetics.
 tornado.options.define("OM_OPERATION_POINTS_DB_DRIVER", default='mongodb+srv', type=str)
 
 
-
 class Application(tornado.web.Application):
     def __init__(self):
         handlers = [
+            (r"/", views.BaseHandler),
             (r"/is_vote_casted", views.RoadmapHandler),
             (r"/get_number_votes", views.RoadmapHandler),
             (r"/get_all_number_votes", views.RoadmapHandler),

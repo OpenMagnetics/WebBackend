@@ -6,3 +6,4 @@ supervisor
 tornado
 bcrypt
 pymongo[srv]
+psycopg2-binary
