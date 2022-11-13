@@ -26,7 +26,7 @@ def delete_none(_dict):
 
 
 def get_table(url):
-    for chunk in url.split("/"):
+    for chunk in url.split("/")[3:]:
         if "operation_point" in chunk:
             return OperationPointsTable()
         if "core" in chunk:
@@ -40,7 +40,7 @@ def get_table(url):
 
 
 def get_table_slug(url):
-    for chunk in url.split("/"):
+    for chunk in url.split("/")[3:]:
         if "operation_point" in chunk:
             return OperationPointSlugsTable()
         if "core" in chunk:
