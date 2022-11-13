@@ -125,6 +125,10 @@ class Milestone(BaseModel):
     milestone_id: int
 
 
+class Username(BaseModel):
+    username: Optional[str] = None
+
+
 class Database:
     def connect(self, schema='public'):
         raise NotImplementedError
@@ -311,7 +315,61 @@ class RoadmapVotesTable(Database):
         return True
 
 
-class OperationPointSlugsTable(Database):
+class SlugsTable(Database):
+    def connect(self, schema='public'):
+        raise NotImplementedError
+
+    def slug_exists(self, slug):
+        self.connect()
+        query = self.session.query(self.Table.slug).filter(self.Table.slug == slug)
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        return not data.empty
+
+    def get_slug_username(self, slug):
+        self.connect()
+        query = self.session.query(self.Table.username).filter(self.Table.slug == slug)
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        if data.empty:
+            return 0
+        else:
+            return data.values[0][0]
+
+    def get_all_slugs(self):
+        self.connect()
+        query = self.session.query(self.Table)
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        if data.empty:
+            return 0
+        else:
+            return data
+
+    def insert_slug(self, slug, username):
+        self.connect()
+        data = {
+            'slug': slug,
+            'username': username
+        }
+        row = self.Table(**data)
+        self.session.add(row)
+        self.session.flush()
+        self.session.commit()
+        query = self.session.query(self.Table)
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        return True
+
+    def delete_slug(self, slug):
+        self.connect()
+        self.session.query(self.Table).filter(self.Table.slug == slug).delete()
+        self.session.commit()
+        self.disconnect()
+        return True
+
+
+class OperationPointSlugsTable(SlugsTable):
     def connect(self, schema='public'):
         path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
         os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
@@ -334,40 +392,104 @@ class OperationPointSlugsTable(Database):
         self.session = Session()
         self.Table = Base.classes.operation_point_slugs
 
-    def slug_exists(self, slug):
-        self.connect()
-        query = self.session.query(self.Table.slug).filter(self.Table.slug == slug)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return not data.empty
 
-    def get_slug_username(self, slug):
-        self.connect()
-        query = self.session.query(self.Table.username).filter(self.Table.slug == slug)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        if data.empty:
-            return 0
-        else:
-            return int(data.values[0][0])
+class CoreSlugsTable(SlugsTable):
+    def connect(self, schema='public'):
+        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
+        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
+        
+        Base = declarative_base()
+        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
 
-    def insert_slug(self, slug, username):
-        self.connect()
-        data = {
-            'slug': slug,
-            'username': username
-        }
-        row = self.Table(**data)
-        self.session.add(row)
-        self.session.flush()
-        self.session.commit()
-        query = self.session.query(self.Table)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return True
+        metadata = MetaData()
+        Table(
+            'core_slugs', metadata, 
+            Column('slug', String, primary_key=True), 
+            Column('username', Integer)
+        )
+
+        metadata.create_all(self.engine)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.core_slugs
 
 
-class OperationPointsTable(Database):
+class BobbinSlugsTable(SlugsTable):
+    def connect(self, schema='public'):
+        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
+        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
+        
+        Base = declarative_base()
+        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
+
+        metadata = MetaData()
+        Table(
+            'bobbin_slugs', metadata, 
+            Column('slug', String, primary_key=True), 
+            Column('username', Integer)
+        )
+
+        metadata.create_all(self.engine)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.bobbin_slugs
+
+
+class WireSlugsTable(SlugsTable):
+    def connect(self, schema='public'):
+        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
+        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
+        
+        Base = declarative_base()
+        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
+
+        metadata = MetaData()
+        Table(
+            'wire_slugs', metadata, 
+            Column('slug', String, primary_key=True), 
+            Column('username', Integer)
+        )
+
+        metadata.create_all(self.engine)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.wire_slugs
+
+
+class MagneticSlugsTable(SlugsTable):
+    def connect(self, schema='public'):
+        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
+        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
+        
+        Base = declarative_base()
+        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
+
+        metadata = MetaData()
+        Table(
+            'magnetic_slugs', metadata, 
+            Column('slug', String, primary_key=True), 
+            Column('username', Integer)
+        )
+
+        metadata.create_all(self.engine)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.magnetic_slugs
+
+
+class DataTable(Database):
 
     def connect(self, schema='public'):
         driver = os.getenv('OM_OPERATION_POINTS_DB_DRIVER')
@@ -375,10 +497,12 @@ class OperationPointsTable(Database):
         user = os.getenv('OM_OPERATION_POINTS_DB_USER')
         password = os.getenv('OM_OPERATION_POINTS_DB_PASSWORD')
 
-        # self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
         self.session = MongoClient(f"{driver}://{user}:{password}@{address}/")
 
-        self.database = self.session.OperationPoints
+        self.database = self.get_table()
+
+    def get_table(self):
+        raise NotImplementedError
 
     def create_user_collection(self, username):
         self.connect()
@@ -392,37 +516,86 @@ class OperationPointsTable(Database):
         self.disconnect()
         return username in collections
 
-    def insert_operation_points(self, username, data):
+    def insert_data(self, username, data):
         self.connect()
         result = self.database[username].insert_one(data)
         self.disconnect()
         return {"result": True,
-                "operation_point_id": json.loads(json_util.dumps(result.inserted_id))['$oid']}
+                "id": json.loads(json_util.dumps(result.inserted_id))['$oid']}
 
-    def update_operation_points(self, username, data, operation_points_id):
+    def update_data(self, username, data, id):
         self.connect()
-        _id = ObjectId(operation_points_id)
+        _id = ObjectId(id)
         result = self.database[username].replace_one({'_id': _id}, data, upsert=False)
         self.disconnect()
         return {"result": result.modified_count == 1,
-                "operation_point_id": operation_points_id}
+                "id": id}
 
-    def get_operation_point_by_id(self, username, operation_points_id):
+    def get_data_by_id(self, username, id):
         self.connect()
-        _id = ObjectId(operation_points_id)
+        _id = ObjectId(id)
         data_read = pandas.DataFrame(self.database[username].find({"_id": _id}))
         self.disconnect()
+        data_read = data_read.drop('updated_at', axis=1, errors='ignore')
+        data_read = data_read.drop('deleted_at', axis=1, errors='ignore')
+        data_read = data_read.drop('created_at', axis=1, errors='ignore')
         return data_read
 
-    def delete_operation_points(self, operation_points_id):
+    def get_data_by_slug(self, username, slug):
         self.connect()
-        query = self.session.query(self.Table).filter(self.Table.id == operation_points_id)
-
-        data = {
-            'deleted_at': datetime.datetime.now()
-        }
-
-        query = query.update(data)
-        self.session.commit()
+        data_read = pandas.DataFrame(self.database[username].find({"slug": slug}))
         self.disconnect()
-        return True
+        data_read = data_read.drop('updated_at', axis=1, errors='ignore')
+        data_read = data_read.drop('deleted_at', axis=1, errors='ignore')
+        data_read = data_read.drop('created_at', axis=1, errors='ignore')
+        return data_read
+
+    def get_data_by_username(self, username):
+        self.connect()
+        data_read = pandas.DataFrame(self.database[username].find({'deleted_at': {"$eq": None}}))
+        self.disconnect()
+        data_read = data_read.drop('updated_at', axis=1, errors='ignore')
+        data_read = data_read.drop('deleted_at', axis=1, errors='ignore')
+        data_read = data_read.drop('created_at', axis=1, errors='ignore')
+        return data_read
+
+    def get_count_by_username(self, username):
+        self.connect()
+        count = self.database[username].count_documents({'deleted_at': {"$eq": None}})
+        self.disconnect()
+        return count
+
+    def delete_data_by_id(self, username, id):
+        self.connect()
+        _id = ObjectId(id)
+        print(_id)
+        result = self.database[username].update_one({'_id': _id}, {"$set": {"deleted_at": datetime.datetime.now()}})
+        print(result)
+        self.disconnect()
+        return {"result": result.modified_count == 1,
+                "id": id}
+
+
+class OperationPointsTable(DataTable):
+    def get_table(self):
+        return self.session.OperationPoints
+
+
+class CoresTable(DataTable):
+    def get_table(self):
+        return self.session.Cores
+
+
+class BobbinsTable(DataTable):
+    def get_table(self):
+        return self.session.Bobbins
+
+
+class WiresTable(DataTable):
+    def get_table(self):
+        return self.session.Wires
+
+
+class MagneticsTable(DataTable):
+    def get_table(self):
+        return self.session.Magnetics
