@@ -201,16 +201,19 @@ def operation_point_load(username: Username, request: Request, element_id_or_slu
 
     if element_id_or_slug is None:
         if not table.user_collection_exists(username):
-            return None
+            table.create_user_collection(username)
 
         result = table.get_data_by_username(username)
+        if result.empty:
+            return {"elements": []}
         result = result.where(pandas.notnull(result), None)
         result["_id"] = result["_id"].astype(str)
         return {"elements": result.to_dict('records')}
     else:
         if is_id:
             if not table.user_collection_exists(username):
-                return None
+                table.create_user_collection(username)
+
             result = table.get_data_by_id(username, element_id_or_slug)
             result = result.where(pandas.notnull(result), None)
             result["_id"] = result["_id"].astype(str)
