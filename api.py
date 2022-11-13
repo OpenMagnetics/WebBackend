@@ -127,7 +127,7 @@ def register(data: UserRegister):
         return{"status": "email exists", "email": data['email']}
     else:
         user_id = user_table.insert_user(**data)
-        return{"status": "registered", "user_id": user_id}
+        return{"status": "registered", "user_id": user_id, "username": data['username']}
 
 
 @app.post("/operation_point_save")
