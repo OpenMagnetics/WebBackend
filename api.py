@@ -2,12 +2,22 @@ from fastapi import FastAPI, Request
 from app.backend.models import UsersTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username
+from app.backend.core_models import Core, CoreShape
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import pandas
 from datetime import datetime
 import json
 import bson
+import sys
 from bson import ObjectId, json_util
+import PyMAS
+import numpy
+import copy
+import os
+
+sys.path.append("../MVB/src")
+from builder import Builder as ShapeBuilder  # noqa: E402
 
 
 def delete_none(_dict):
@@ -23,6 +33,24 @@ def delete_none(_dict):
         _dict = type(_dict)(delete_none(item) for item in _dict if item is not None)
 
     return _dict
+
+
+def flatten_dimensions(data):
+    dimensions = data["dimensions"]
+    for k, v in dimensions.items():
+        if "nominal" not in v:
+            if "maximum" not in v:
+                v["nominal"] = v["minimum"]
+            elif "minimum" not in v:
+                v["nominal"] = v["maximum"]
+            else:
+                v["nominal"] = round((v["maximum"] + v["minimum"]) / 2, 6)
+    dim = {}
+    for k, v in dimensions.items():
+        dim[k] = v["nominal"]
+
+    data["dimensions"] = dim
+    return data
 
 
 def get_table(url):
@@ -241,7 +269,6 @@ def operation_point_load(username: Username, request: Request, element_id_or_slu
 @app.post("/magnetic_count")
 def count(username: Username, request: Request):
     table = get_table(request.url._url)
-    print(table)
     username = username.dict()["username"]
 
     if username is None:
@@ -251,7 +278,6 @@ def count(username: Username, request: Request):
         table.create_user_collection(username)
 
     count = table.get_count_by_username(username)
-    print(count)
     return {"count": count}
 
 
@@ -285,3 +311,44 @@ def operation_point_delete(username: Username, request: Request, element_id: str
             return {"id": result["id"]}
         else:
             return {"id": None}
+
+
+@app.post("/core_get_families")
+def core_get_families():
+    families = ShapeBuilder().get_families()
+    return {"families": families}
+
+
+@app.post("/core_get_commercial_data")
+def core_get_commercial_data(core: Core):
+    commercial_data = pandas.read_json('../MAS/data/shapes.ndjson', lines=True)
+    commercial_data = commercial_data.where(pandas.notnull(commercial_data), None)
+    commercial_data = commercial_data.replace({numpy.nan: None})
+
+    core = core.dict()
+    core_data = pandas.DataFrame()
+    for index, row in commercial_data.iterrows():
+        if row['family'] not in ['ui']:
+            datum = flatten_dimensions(row.to_dict())
+            core_aux = copy.deepcopy(core)
+            if "familySubtype" in datum and datum["familySubtype"] is not None:
+                datum["familySubtype"] = str(int(datum["familySubtype"]))
+            core_aux['functionalDescription']['shape'] = datum
+
+            core_datum = PyMAS.get_core_data(core_aux)
+            # core_datum['name'] = datum['name']
+            # core_datum['family'] = datum['family']
+            # core_datum['dimensions'] = datum['dimensions']
+            core_data = core_data.append(core_datum, ignore_index=True)
+
+    return {"commercial_data": core_data.to_dict('records')}
+
+
+@app.post("/core_compute_shape")
+def core_compute_shape(coreShape: CoreShape):
+    coreShape = coreShape.dict()
+    core_builder = ShapeBuilder().factory(coreShape)
+    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")
+    step_path, obj_path = core_builder.get_piece(coreShape)
+
+    return FileResponse(obj_path)
