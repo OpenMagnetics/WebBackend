@@ -336,7 +336,7 @@ def core_get_commercial_data(core: Core):
             core_aux['functionalDescription']['shape'] = datum
 
             core_datum = PyMAS.get_core_data(core_aux)
-            core_data = core_data.append(core_datum, ignore_index=True)
+            core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
     return {"commercial_data": core_data.to_dict('records')}
 
