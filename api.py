@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username
@@ -329,16 +329,13 @@ def core_get_commercial_data(core: Core):
     core_data = pandas.DataFrame()
     for index, row in commercial_data.iterrows():
         if row['family'] not in ['ui']:
-            datum = flatten_dimensions(row.to_dict())
+            datum = flatten_dimensions(row.to_dict()) 
             core_aux = copy.deepcopy(core)
             if "familySubtype" in datum and datum["familySubtype"] is not None:
                 datum["familySubtype"] = str(int(datum["familySubtype"]))
             core_aux['functionalDescription']['shape'] = datum
 
             core_datum = PyMAS.get_core_data(core_aux)
-            # core_datum['name'] = datum['name']
-            # core_datum['family'] = datum['family']
-            # core_datum['dimensions'] = datum['dimensions']
             core_data = core_data.append(core_datum, ignore_index=True)
 
     return {"commercial_data": core_data.to_dict('records')}
@@ -350,5 +347,34 @@ def core_compute_shape(coreShape: CoreShape):
     core_builder = ShapeBuilder().factory(coreShape)
     core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")
     step_path, obj_path = core_builder.get_piece(coreShape)
+    print(obj_path)
+    print(step_path)
+    if step_path is None:
+        raise HTTPException(status_code=418, detail="Wrong dimensions")
+    else:
+        return FileResponse(obj_path)
 
-    return FileResponse(obj_path)
+
+@app.post("/core_compute_technical_drawing")
+def core_compute_technical_drawing(coreShape: CoreShape):
+    coreShape = coreShape.dict()
+    core_builder = ShapeBuilder().factory(coreShape)
+    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")
+    colors = {
+        "projection_color": "#d4d4d4",
+        "dimension_color": "#d4d4d4"
+    }
+    print("Getting drawing")
+    views = core_builder.get_piece_technical_drawing(coreShape, colors)
+    print("Got drawing")
+    if views['top_view'] is None or views['front_view'] is None:
+        raise HTTPException(status_code=418, detail="Wrong dimensions")
+    else:
+        return views
+
+
+@app.post("/core_compute_core_parameters")
+def core_compute_core_parameters(core: Core):
+    core = core.dict()
+    core_datum = PyMAS.get_core_data(core)
+    return core_datum
