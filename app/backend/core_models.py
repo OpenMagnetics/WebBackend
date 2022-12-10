@@ -30,6 +30,7 @@ class CoreBobbinFamily(str, Enum):
     pq = "pq"
     rm = "rm"
     u = "u"
+    ut = "ut"
 
 
 class Status(str, Enum):
@@ -288,6 +289,7 @@ class CoreShapeFamily(str, Enum):
     u = "u"
     ui = "ui"
     ur = "ur"
+    ut = "ut"
 
 
 class CoreShape(BaseModel):
@@ -313,6 +315,7 @@ class FunctionalDescriptionType(str, Enum):
     pieceandplate = "piece and plate"
     toroidal = "toroidal"
     twopieceset = "two-piece set"
+    closedshape = "closed shape"
 
 
 class FunctionalDescription(BaseModel):
@@ -432,6 +435,7 @@ class GeometricalDescriptionType(str, Enum):
     sheet = "sheet"
     spacer = "spacer"
     toroidal = "toroidal"
+    closed = "closed"
 
 
 class GeometricalDescription(BaseModel):

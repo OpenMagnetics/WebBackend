@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username
-from app.backend.core_models import Core, CoreShape
+from app.backend.core_models import Core, CoreShape, CoreGap
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import pandas
@@ -11,10 +11,12 @@ import json
 import bson
 import sys
 from bson import ObjectId, json_util
-import PyMAS
+import PyMKF
 import numpy
 import copy
+import pprint
 import os
+from typing import List
 
 sys.path.append("../MVB/src")
 from builder import Builder as ShapeBuilder  # noqa: E402
@@ -109,10 +111,16 @@ def is_vote_casted(data: Vote):
     return {"already_voted": vote}
 
 
+@app.post("/are_vote_casted")
+def are_vote_casted(data: Vote):
+    vote = RoadmapVotesTable().are_vote_casted(**data.dict())
+    return {"voted_milestones": vote.to_dict('records')}
+
+
 @app.post("/get_number_votes")
-def get_number_votes(data: Milestone):
-    number_votes = RoadmapVotesTable().get_number_votes(**data.dict())
-    return {"number_votes": number_votes}
+def get_number_votes():
+    number_votes = RoadmapVotesTable().get_all_number_votes()
+    return {"number_votes": number_votes.to_dict('records')}
 
 
 @app.post("/get_all_number_votes")
@@ -320,22 +328,32 @@ def core_get_families():
 
 
 @app.post("/core_get_commercial_data")
-def core_get_commercial_data(core: Core):
+def core_get_commercial_data():
     commercial_data = pandas.read_json('../MAS/data/shapes.ndjson', lines=True)
     commercial_data = commercial_data.where(pandas.notnull(commercial_data), None)
     commercial_data = commercial_data.replace({numpy.nan: None})
 
-    core = core.dict()
     core_data = pandas.DataFrame()
+    dummyCore = {
+        "functionalDescription": {
+            "name": "dummy",
+            "type": "two-piece set",
+            "material": "N97",
+            "shape": None,
+            "gapping": [],
+            "numberStacks": 1
+        }
+    }
     for index, row in commercial_data.iterrows():
         if row['family'] not in ['ui']:
             datum = flatten_dimensions(row.to_dict()) 
-            core_aux = copy.deepcopy(core)
             if "familySubtype" in datum and datum["familySubtype"] is not None:
                 datum["familySubtype"] = str(int(datum["familySubtype"]))
-            core_aux['functionalDescription']['shape'] = datum
+            if row['family'] in ['ut']:
+                dummyCore['functionalDescription']['type'] = "closed shape"
+            dummyCore['functionalDescription']['shape'] = datum
 
-            core_datum = PyMAS.get_core_data(core_aux)
+            core_datum = PyMKF.get_core_data(dummyCore)
             core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
     return {"commercial_data": core_data.to_dict('records')}
@@ -345,10 +363,8 @@ def core_get_commercial_data(core: Core):
 def core_compute_shape(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
-    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")
+    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")    
     step_path, obj_path = core_builder.get_piece(coreShape)
-    print(obj_path)
-    print(step_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -364,9 +380,7 @@ def core_compute_technical_drawing(coreShape: CoreShape):
         "projection_color": "#d4d4d4",
         "dimension_color": "#d4d4d4"
     }
-    print("Getting drawing")
     views = core_builder.get_piece_technical_drawing(coreShape, colors)
-    print("Got drawing")
     if views['top_view'] is None or views['front_view'] is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -376,5 +390,31 @@ def core_compute_technical_drawing(coreShape: CoreShape):
 @app.post("/core_compute_core_parameters")
 def core_compute_core_parameters(core: Core):
     core = core.dict()
-    core_datum = PyMAS.get_core_data(core)
+    core_datum = PyMKF.get_core_data(core)
     return core_datum
+
+
+@app.post("/core_compute_gap_reluctances")
+async def core_compute_gap_reluctances(request: Request):
+    json = await request.json()
+    model = json["model"]
+    gapping = json["gapping"]
+    pprint.pprint(model)
+    pprint.pprint(gapping)
+    gapping_data = []
+    for index in range(0, len(gapping)):
+        gapping_data.append(PyMKF.get_gap_reluctance(gapping[index], model.upper().replace(" ", "_")))
+
+    return gapping_data
+
+
+@app.post("/get_constants")
+def get_constants():
+    constants = PyMKF.get_constants()
+    return constants
+
+
+@app.post("/get_gap_reluctance_models")
+def get_gap_reluctance_models():
+    models_info = PyMKF.get_gap_reluctance_model_information()
+    return models_info

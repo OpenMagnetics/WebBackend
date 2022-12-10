@@ -113,7 +113,7 @@ class UserRegister(BaseModel):
 class Vote(BaseModel):
     ip_address: str
     user_id: Optional[int] = None
-    milestone_id: int
+    milestone_id: int = None
 
 
 class User(BaseModel):
@@ -278,6 +278,21 @@ class RoadmapVotesTable(Database):
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
         return not data.empty
+
+    def are_vote_casted(self, ip_address, user_id, milestone_id=None):
+        self.connect()
+        if milestone_id is None:
+            query = self.session.query(self.Table.milestone_id)
+        else:
+            query = self.session.query(self.Table.milestone_id).filter(self.Table.milestone_id == milestone_id)
+
+        if user_id is None:
+            query = query.filter(self.Table.ip_address == ip_address)
+        else:
+            query = query.filter(self.Table.user_id == user_id)
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        return data
 
     def get_number_votes(self, milestone_id):
         self.connect()
