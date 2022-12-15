@@ -349,11 +349,12 @@ def core_get_commercial_data():
             datum = flatten_dimensions(row.to_dict()) 
             if "familySubtype" in datum and datum["familySubtype"] is not None:
                 datum["familySubtype"] = str(int(datum["familySubtype"]))
+            core = copy.deepcopy(dummyCore)
             if row['family'] in ['ut']:
-                dummyCore['functionalDescription']['type'] = "closed shape"
-            dummyCore['functionalDescription']['shape'] = datum
+                core['functionalDescription']['type'] = "closed shape"
+            core['functionalDescription']['shape'] = datum
 
-            core_datum = PyMKF.get_core_data(dummyCore)
+            core_datum = PyMKF.get_core_data(core)
             core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
     return {"commercial_data": core_data.to_dict('records')}
@@ -365,6 +366,24 @@ def core_compute_shape(coreShape: CoreShape):
     core_builder = ShapeBuilder().factory(coreShape)
     core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")    
     step_path, obj_path = core_builder.get_piece(coreShape)
+    if step_path is None:
+        raise HTTPException(status_code=418, detail="Wrong dimensions")
+    else:
+        return FileResponse(obj_path)
+
+
+@app.post("/core_compute_core_3d_model")
+def core_compute_core_3d_model(core: Core):
+
+    core = core.dict()
+
+    core_datum = PyMKF.get_core_data(core)
+    pprint.pprint(core)
+    step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
+                                                  geometrical_description=core_datum['geometricalDescription'],
+                                                  output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
+    print(step_path)
+    print(obj_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -390,7 +409,11 @@ def core_compute_technical_drawing(coreShape: CoreShape):
 @app.post("/core_compute_core_parameters")
 def core_compute_core_parameters(core: Core):
     core = core.dict()
+    # pprint.pprint("core")
+    # pprint.pprint(core)
     core_datum = PyMKF.get_core_data(core)
+    # pprint.pprint("core_datum")
+    # pprint.pprint(core_datum)
     return core_datum
 
 
@@ -399,8 +422,6 @@ async def core_compute_gap_reluctances(request: Request):
     json = await request.json()
     model = json["model"]
     gapping = json["gapping"]
-    pprint.pprint(model)
-    pprint.pprint(gapping)
     gapping_data = []
     for index in range(0, len(gapping)):
         gapping_data.append(PyMKF.get_gap_reluctance(gapping[index], model.upper().replace(" ", "_")))

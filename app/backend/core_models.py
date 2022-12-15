@@ -450,6 +450,7 @@ class GeometricalDescription(BaseModel):
     The coordinates of the center of the gap, referred to the center of the main column
     """
     coordinates: List[float]
+    rotation: List[float]
     material: Union[Material, str]
     shape: Union[CoreShape, None, str]
     """The type of piece
