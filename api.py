@@ -22,6 +22,21 @@ sys.path.append("../MVB/src")
 from builder import Builder as ShapeBuilder  # noqa: E402
 
 
+def clean_dimensions(core):
+    # Make sure no unwanted dimension gets in
+    families = ShapeBuilder().get_families()
+    if "familySubtype" in core['functionalDescription']['shape']:
+        dimensions = families[core['functionalDescription']['shape']['family']][int(core['functionalDescription']['shape']['familySubtype'])]
+    else:
+        dimensions = families[core['functionalDescription']['shape']['family']][1]
+    aux = copy.deepcopy(core['functionalDescription']['shape']['dimensions'])
+    for key, value in core['functionalDescription']['shape']['dimensions'].items():
+        if key not in dimensions:
+            aux.pop(key)
+    core['functionalDescription']['shape']['dimensions'] = aux
+    return core
+
+
 def delete_none(_dict):
     """Delete None values recursively from all of the dictionaries, tuples, lists, sets"""
     if isinstance(_dict, dict):
@@ -377,8 +392,14 @@ def core_compute_core_3d_model(core: Core):
 
     core = core.dict()
 
-    core_datum = PyMKF.get_core_data(core)
+    core = clean_dimensions(core)
+    pprint.pprint("core")
     pprint.pprint(core)
+    core['geometricalDescription'] = None
+    core['processedDescription'] = None
+    core_datum = PyMKF.get_core_data(core)
+    pprint.pprint("core_datum")
+    pprint.pprint(core_datum)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
                                                   geometrical_description=core_datum['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
@@ -406,11 +427,35 @@ def core_compute_technical_drawing(coreShape: CoreShape):
         return views
 
 
+@app.post("/core_compute_gapping_technical_drawing")
+def core_compute_gapping_technical_drawing(core: Core):
+    core = core.dict()
+
+    core_datum = PyMKF.get_core_data(core)
+    # pprint.pprint(core)
+
+    colors = {
+        "projection_color": "#d4d4d4",
+        "dimension_color": "#d4d4d4"
+    }
+
+    views = ShapeBuilder().get_core_gapping_technical_drawing(project_name=core_datum['functionalDescription']['shape']['name'],
+                                                              core_data=core_datum,
+                                                              colors=colors,
+                                                              save_files=False)
+    if views['front_view'] is None:
+        raise HTTPException(status_code=418, detail="Wrong dimensions")
+    else:
+        return views
+
+
 @app.post("/core_compute_core_parameters")
 def core_compute_core_parameters(core: Core):
     core = core.dict()
-    # pprint.pprint("core")
-    # pprint.pprint(core)
+    pprint.pprint("core")
+    pprint.pprint(core)
+    core = clean_dimensions(core)
+
     core_datum = PyMKF.get_core_data(core)
     # pprint.pprint("core_datum")
     # pprint.pprint(core_datum)
