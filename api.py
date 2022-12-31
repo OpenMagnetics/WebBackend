@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username
-from app.backend.core_models import Core, CoreShape, CoreGap
+from app.backend.core_models import MagneticCore, CoreShape, CoreGap
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import pandas
@@ -344,9 +344,9 @@ def core_get_families():
 
 @app.post("/core_get_commercial_data")
 def core_get_commercial_data():
-    commercial_data = pandas.read_json('../MAS/data/shapes.ndjson', lines=True)
-    commercial_data = commercial_data.where(pandas.notnull(commercial_data), None)
-    commercial_data = commercial_data.replace({numpy.nan: None})
+    commercial_shapes = pandas.read_json('../MAS/data/shapes.ndjson', lines=True)
+    commercial_shapes = commercial_shapes.where(pandas.notnull(commercial_shapes), None)
+    commercial_shapes = commercial_shapes.replace({numpy.nan: None})
 
     core_data = pandas.DataFrame()
     dummyCore = {
@@ -359,7 +359,7 @@ def core_get_commercial_data():
             "numberStacks": 1
         }
     }
-    for index, row in commercial_data.iterrows():
+    for index, row in commercial_shapes.iterrows():
         if row['family'] not in ['ui']:
             datum = flatten_dimensions(row.to_dict()) 
             if "familySubtype" in datum and datum["familySubtype"] is not None:
@@ -372,7 +372,16 @@ def core_get_commercial_data():
             core_datum = PyMKF.get_core_data(core)
             core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
-    return {"commercial_data": core_data.to_dict('records')}
+    return {"commercial_cores": core_data.to_dict('records')}
+
+
+@app.post("/core_get_commercial_materials")
+def core_get_commercial_materials():
+    commercial_materials = pandas.read_json('../MAS/data/materials.ndjson', lines=True)
+    commercial_materials = commercial_materials.where(pandas.notnull(commercial_materials), None)
+    commercial_materials = commercial_materials.replace({numpy.nan: None})
+
+    return {"commercial_materials": commercial_materials.to_dict('records')}
 
 
 @app.post("/core_compute_shape")
@@ -388,18 +397,18 @@ def core_compute_shape(coreShape: CoreShape):
 
 
 @app.post("/core_compute_core_3d_model")
-def core_compute_core_3d_model(core: Core):
+def core_compute_core_3d_model(core: MagneticCore):
 
     core = core.dict()
 
     core = clean_dimensions(core)
-    pprint.pprint("core")
-    pprint.pprint(core)
+    # pprint.pprint("core")
+    # pprint.pprint(core)
     core['geometricalDescription'] = None
     core['processedDescription'] = None
     core_datum = PyMKF.get_core_data(core)
-    pprint.pprint("core_datum")
-    pprint.pprint(core_datum)
+    # pprint.pprint("core_datum")
+    # pprint.pprint(core_datum)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
                                                   geometrical_description=core_datum['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
@@ -428,7 +437,7 @@ def core_compute_technical_drawing(coreShape: CoreShape):
 
 
 @app.post("/core_compute_gapping_technical_drawing")
-def core_compute_gapping_technical_drawing(core: Core):
+def core_compute_gapping_technical_drawing(core: MagneticCore):
     core = core.dict()
 
     core_datum = PyMKF.get_core_data(core)
@@ -450,12 +459,12 @@ def core_compute_gapping_technical_drawing(core: Core):
 
 
 @app.post("/core_compute_core_parameters")
-def core_compute_core_parameters(core: Core):
+def core_compute_core_parameters(core: MagneticCore):
+    # pprint.pprint("core_compute_core_parameters")
     core = core.dict()
-    pprint.pprint("core")
-    pprint.pprint(core)
+    # pprint.pprint("core")
+    # pprint.pprint(core)
     core = clean_dimensions(core)
-
     core_datum = PyMKF.get_core_data(core)
     # pprint.pprint("core_datum")
     # pprint.pprint(core_datum)

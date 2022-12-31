@@ -7,3 +7,4 @@ fastapi
 bcrypt
 pymongo[srv]
 psycopg2-binary
+uvicorn
