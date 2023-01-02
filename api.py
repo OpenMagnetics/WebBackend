@@ -397,6 +397,7 @@ def core_compute_shape(coreShape: CoreShape):
         return FileResponse(obj_path)
 
 
+@app.post("/core_compute_core_3d_model_obj")
 @app.post("/core_compute_core_3d_model")
 def core_compute_core_3d_model(core: MagneticCore):
 
@@ -419,6 +420,26 @@ def core_compute_core_3d_model(core: MagneticCore):
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(obj_path)
+
+
+@app.post("/core_compute_core_3d_model_stp")
+def core_compute_core_3d_model_stp(core: MagneticCore):
+
+    core = core.dict()
+
+    core = clean_dimensions(core)
+    core['geometricalDescription'] = None
+    core['processedDescription'] = None
+    core_datum = PyMKF.get_core_data(core)
+    step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
+                                                  geometrical_description=core_datum['geometricalDescription'],
+                                                  output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
+    print(step_path)
+    print(obj_path)
+    if step_path is None:
+        raise HTTPException(status_code=418, detail="Wrong dimensions")
+    else:
+        return FileResponse(step_path)
 
 
 @app.post("/core_compute_technical_drawing")
