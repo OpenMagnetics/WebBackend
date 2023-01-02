@@ -385,6 +385,7 @@ def core_get_commercial_materials():
     return {"commercial_materials": commercial_materials.to_dict('records')}
 
 
+@app.post("/core_compute_shape_obj")
 @app.post("/core_compute_shape")
 def core_compute_shape(coreShape: CoreShape):
     coreShape = coreShape.dict()
@@ -395,6 +396,18 @@ def core_compute_shape(coreShape: CoreShape):
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(obj_path)
+
+
+@app.post("/core_compute_shape_stp")
+def core_compute_shape_stp(coreShape: CoreShape):
+    coreShape = coreShape.dict()
+    core_builder = ShapeBuilder().factory(coreShape)
+    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")    
+    step_path, obj_path = core_builder.get_piece(coreShape)
+    if step_path is None:
+        raise HTTPException(status_code=418, detail="Wrong dimensions")
+    else:
+        return FileResponse(step_path)
 
 
 @app.post("/core_compute_core_3d_model_obj")
