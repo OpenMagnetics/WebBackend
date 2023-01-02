@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username
-from app.backend.core_models import MagneticCore, CoreShape, CoreGap
+from app.backend.core_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import pandas
@@ -16,7 +16,7 @@ import numpy
 import copy
 import pprint
 import os
-from typing import List
+from typing import List, Union
 
 sys.path.append("../MVB/src")
 from builder import Builder as ShapeBuilder  # noqa: E402
@@ -25,7 +25,7 @@ from builder import Builder as ShapeBuilder  # noqa: E402
 def clean_dimensions(core):
     # Make sure no unwanted dimension gets in
     families = ShapeBuilder().get_families()
-    if "familySubtype" in core['functionalDescription']['shape']:
+    if "familySubtype" in core['functionalDescription']['shape'] and core['functionalDescription']['shape']['familySubtype'] is not None:
         dimensions = families[core['functionalDescription']['shape']['family']][int(core['functionalDescription']['shape']['familySubtype'])]
     else:
         dimensions = families[core['functionalDescription']['shape']['family']][1]
@@ -191,9 +191,10 @@ def register(data: UserRegister):
 @app.post("/wire_save/{id}")
 @app.post("/magnetic_save")
 @app.post("/magnetic_save/{id}")
-def operation_point_save(data: OperationPoint, request: Request, id: str = None):
+async def save(request: Request, id: str = None):
     table = get_table(request.url._url)
-    data = data.dict()
+    data = await request.json()
+    pprint.pprint(data)
     username = data.pop("username")
     data = delete_none(data)
     data["updated_at"] = datetime.now()
@@ -462,12 +463,13 @@ def core_compute_gapping_technical_drawing(core: MagneticCore):
 def core_compute_core_parameters(core: MagneticCore):
     # pprint.pprint("core_compute_core_parameters")
     core = core.dict()
-    # pprint.pprint("core")
-    # pprint.pprint(core)
-    core = clean_dimensions(core)
+    pprint.pprint("core")
+    pprint.pprint(core)
+    if not isinstance(core['functionalDescription']['shape'], str):
+        core = clean_dimensions(core)
     core_datum = PyMKF.get_core_data(core)
-    # pprint.pprint("core_datum")
-    # pprint.pprint(core_datum)
+    pprint.pprint("core_datum")
+    pprint.pprint(core_datum)
     return core_datum
 
 

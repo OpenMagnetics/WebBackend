@@ -652,7 +652,7 @@ class CoreShape(BaseModel):
     name: Optional[str] = None
 
 
-class FunctionalDescriptionType(Enum):
+class CoreType(Enum):
     """The type of core"""
     closedshape = "closed shape"
     pieceandplate = "piece and plate"
@@ -672,7 +672,7 @@ class CoreFunctionalDescription(BaseModel):
     material: Union[CoreMaterial, str]
     shape: Union[CoreShape, str]
     """The type of core"""
-    type: FunctionalDescriptionType
+    type: CoreType
     """The name of core"""
     name: Optional[str] = None
     """The number of stacked cores"""
