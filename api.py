@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
-from app.backend.models import UsersTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
+from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
-from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username
+from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport
 from app.backend.core_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -120,12 +120,6 @@ def read_root():
     return {"Hello": "World"}
 
 
-@app.post("/is_vote_casted")
-def is_vote_casted(data: Vote):
-    vote = RoadmapVotesTable().is_vote_casted(**data.dict())
-    return {"already_voted": vote}
-
-
 @app.post("/are_vote_casted")
 def are_vote_casted(data: Vote):
     vote = RoadmapVotesTable().are_vote_casted(**data.dict())
@@ -153,6 +147,22 @@ def cast_vote(data: Vote):
     else:
         vote = roadmap_votes_table.insert_vote(**data.dict())
         return {"voted": vote}
+
+
+@app.post("/get_notifications")
+def get_notifications():
+    notifications_table = NotificationsTable()
+    new_notifications = notifications_table.read_active_notifications(datetime.now())
+    return{"notifications": new_notifications.to_dict('records')}
+
+
+@app.post("/report_bug")
+def report_bug(data: BugReport):
+    data = data.dict()
+
+    bug_reports_table = BugReportsTable()
+    bug_report_id = bug_reports_table.report_bug(data['username'], data['userDataDump'], data['userInformation'])
+    return{"status": "reported", "bug_report_id": bug_report_id}
 
 
 @app.post("/login")
@@ -354,7 +364,7 @@ def core_get_commercial_data():
         "functionalDescription": {
             "name": "dummy",
             "type": "two-piece set",
-            "material": "N97",
+            "material": "dummy",
             "shape": None,
             "gapping": [],
             "numberStacks": 1
@@ -369,8 +379,7 @@ def core_get_commercial_data():
             if row['family'] in ['ut']:
                 core['functionalDescription']['type'] = "closed shape"
             core['functionalDescription']['shape'] = datum
-
-            core_datum = PyMKF.get_core_data(core)
+            core_datum = PyMKF.get_core_data(core, False)
             core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
     return {"commercial_cores": core_data.to_dict('records')}
@@ -421,7 +430,7 @@ def core_compute_core_3d_model(core: MagneticCore):
     # pprint.pprint(core)
     core['geometricalDescription'] = None
     core['processedDescription'] = None
-    core_datum = PyMKF.get_core_data(core)
+    core_datum = PyMKF.get_core_data(core, False)
     # pprint.pprint("core_datum")
     # pprint.pprint(core_datum)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
@@ -443,7 +452,7 @@ def core_compute_core_3d_model_stp(core: MagneticCore):
     core = clean_dimensions(core)
     core['geometricalDescription'] = None
     core['processedDescription'] = None
-    core_datum = PyMKF.get_core_data(core)
+    core_datum = PyMKF.get_core_data(core, False)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
                                                   geometrical_description=core_datum['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
@@ -475,7 +484,7 @@ def core_compute_technical_drawing(coreShape: CoreShape):
 def core_compute_gapping_technical_drawing(core: MagneticCore):
     core = core.dict()
 
-    core_datum = PyMKF.get_core_data(core)
+    core_datum = PyMKF.get_core_data(core, False)
     # pprint.pprint(core)
 
     colors = {
@@ -494,6 +503,12 @@ def core_compute_gapping_technical_drawing(core: MagneticCore):
 
 
 @app.post("/core_compute_core_parameters")
+# async def core_compute_core_parameters(request: Request):
+#     json = await request.json()
+#     pprint.pprint("json")
+#     pprint.pprint(json)
+#     MagneticCore(**json)
+#     assert 0
 def core_compute_core_parameters(core: MagneticCore):
     # pprint.pprint("core_compute_core_parameters")
     core = core.dict()
@@ -501,7 +516,7 @@ def core_compute_core_parameters(core: MagneticCore):
     pprint.pprint(core)
     if not isinstance(core['functionalDescription']['shape'], str):
         core = clean_dimensions(core)
-    core_datum = PyMKF.get_core_data(core)
+    core_datum = PyMKF.get_core_data(core, False)
     pprint.pprint("core_datum")
     pprint.pprint(core_datum)
     return core_datum

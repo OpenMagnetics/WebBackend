@@ -8,3 +8,5 @@ bcrypt
 pymongo[srv]
 psycopg2-binary
 uvicorn
+circus
+shiboken2

@@ -112,7 +112,6 @@ class UserRegister(BaseModel):
 
 class Vote(BaseModel):
     ip_address: str
-    user_id: Optional[int] = None
     milestone_id: int = None
 
 
@@ -129,12 +128,48 @@ class Username(BaseModel):
     username: Optional[str] = None
 
 
+class BugReport(BaseModel):
+    userDataDump: dict
+    userInformation: Optional[str] = None
+    username: Optional[str] = None
+
+
 class Database:
     def connect(self, schema='public'):
         raise NotImplementedError
 
     def disconnect(self):
         self.session.close()
+
+
+class NotificationsTable(Database):
+
+    def connect(self, schema='public'):
+        driver = "postgresql"
+        address = os.getenv('OM_USERS_DB_ADDRESS')
+        port = os.getenv('OM_USERS_DB_PORT')
+        name = os.getenv('OM_USERS_DB_NAME')
+        user = os.getenv('OM_USERS_DB_USER')
+        password = os.getenv('OM_USERS_DB_PASSWORD')
+
+        self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
+
+        metadata = sqlalchemy.MetaData()
+        metadata.reflect(self.engine, schema=schema)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.notifications
+
+    def read_active_notifications(self, datetime):
+        self.connect()
+        query = self.session.query(self.Table).filter(self.Table.starting_date < datetime)
+        query = query.filter(sqlalchemy.or_(self.Table.ending_date >= datetime, self.Table.ending_date.is_(None)))
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        return data
 
 
 class UsersTable(Database):
@@ -243,6 +278,44 @@ class UsersTable(Database):
         return user_id
 
 
+class BugReportsTable(Database):
+
+    def connect(self, schema='public'):
+        driver = "postgresql"
+        address = os.getenv('OM_USERS_DB_ADDRESS')
+        port = os.getenv('OM_USERS_DB_PORT')
+        name = os.getenv('OM_USERS_DB_NAME')
+        user = os.getenv('OM_USERS_DB_USER')
+        password = os.getenv('OM_USERS_DB_PASSWORD')
+
+        self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
+
+        metadata = sqlalchemy.MetaData()
+        metadata.reflect(self.engine, schema=schema)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.bug_reports
+
+    def report_bug(self, username, user_data, user_information):
+        self.connect()
+        data = {
+            'username': username,
+            'user_data': user_data,
+            'user_information': user_information,
+            'created_at': datetime.datetime.now()
+        }
+        row = self.Table(**data)
+        self.session.add(row)
+        self.session.flush()
+        bug_report_id = row.index
+        self.session.commit()
+        self.disconnect()
+        return bug_report_id
+
+
 class RoadmapVotesTable(Database):
     def connect(self, schema='public'):
         path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
@@ -268,28 +341,22 @@ class RoadmapVotesTable(Database):
         self.session = Session()
         self.Table = Base.classes.milestone_voting
 
-    def is_vote_casted(self, ip_address, user_id, milestone_id):
+    def is_vote_casted(self, ip_address, milestone_id):
         self.connect()
         query = self.session.query(self.Table.milestone_id).filter(self.Table.milestone_id == milestone_id)
-        if user_id is None:
-            query = query.filter(self.Table.ip_address == ip_address)
-        else:
-            query = query.filter(self.Table.user_id == user_id)
+        query = query.filter(self.Table.ip_address == ip_address)
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
         return not data.empty
 
-    def are_vote_casted(self, ip_address, user_id, milestone_id=None):
+    def are_vote_casted(self, ip_address, milestone_id=None):
         self.connect()
         if milestone_id is None:
             query = self.session.query(self.Table.milestone_id)
         else:
             query = self.session.query(self.Table.milestone_id).filter(self.Table.milestone_id == milestone_id)
 
-        if user_id is None:
-            query = query.filter(self.Table.ip_address == ip_address)
-        else:
-            query = query.filter(self.Table.user_id == user_id)
+        query = query.filter(self.Table.ip_address == ip_address)
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
         return data
@@ -313,11 +380,11 @@ class RoadmapVotesTable(Database):
         self.disconnect()
         return data
 
-    def insert_vote(self, ip_address, user_id, milestone_id):
+    def insert_vote(self, ip_address, milestone_id):
         self.connect()
         data = {
             'ip_address': ip_address,
-            'user_id': user_id,
+            'user_id': None,
             'milestone_id': milestone_id
         }
         row = self.Table(**data)
@@ -583,9 +650,7 @@ class DataTable(Database):
     def delete_data_by_id(self, username, id):
         self.connect()
         _id = ObjectId(id)
-        print(_id)
         result = self.database[username].update_one({'_id': _id}, {"$set": {"deleted_at": datetime.datetime.now()}})
-        print(result)
         self.disconnect()
         return {"result": result.modified_count == 1,
                 "id": id}
