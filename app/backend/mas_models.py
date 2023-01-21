@@ -24,6 +24,8 @@ class NumericRequirement(BaseModel):
     maximum: Optional[float] = None
     """Minimum value of the requirement"""
     minimum: Optional[float] = None
+    """Nominal value of the requirement"""
+    nominal: Optional[float] = None
 
 
 class CTI(Enum):
@@ -67,6 +69,8 @@ class DesignRequirements(BaseModel):
     """
     """Required values for the magnetizing inductance"""
     magnetizingInductance: NumericRequirement
+    """Required turns ratios between primary and the rest of windings"""
+    turnsRatios: List[NumericRequirement]
     """Required values for the altitude"""
     altitude: Optional[NumericRequirement] = None
     """Required CTI"""
@@ -127,8 +131,9 @@ class Harmonics(BaseModel):
     frequencies: List[float]
 
 
-class Label(Enum):
+class WaveformLabel(Enum):
     """Label of the waveform, if applicable. Used for common waveforms"""
+    custom = "custom"
     flyback = "flyback"
     phaseshiftedfullbridge = "phase-shifted full bridge"
     sinusoidal = "sinusoidal"
@@ -140,18 +145,18 @@ class Label(Enum):
 class Processed(BaseModel):
     class Config:  
         use_enum_values = True
+    """Label of the waveform, if applicable. Used for common waveforms"""
+    label: WaveformLabel
+    """The offset value of the waveform, referred to 0"""
+    offset: float
+    """The peak to peak value of the waveform"""
+    peakToPeak: float
     """The duty cycle of the waveform, if applicable"""
     dutyCycle: Optional[float] = None
     """The effective frequency value of the waveform, according to
     https://sci-hub.wf/https://ieeexplore.ieee.org/document/750181, Appedix C
     """
     effectiveFrequency: Optional[float] = None
-    """Label of the waveform, if applicable. Used for common waveforms"""
-    label: Optional[Label] = None
-    """The offset value of the waveform, referred to 0"""
-    offset: Optional[float] = None
-    """The peak to peak value of the waveform"""
-    peakToPeak: Optional[float] = None
     """The RMS value of the waveform"""
     rms: Optional[float] = None
     """The Total Harmonic Distortion of the waveform, according to
@@ -172,6 +177,7 @@ class Waveform(BaseModel):
     data: List[float]
     """The number of periods covered by the data"""
     numberPeriods: Optional[int] = None
+    ancillaryLabel: Optional[str] = None
     time: Optional[List[float]] = None
 
 
@@ -181,12 +187,12 @@ class ElectromagneticParameter(BaseModel):
     """Structure definining one electromagnetic parameters: current, voltage, magnetic flux
     density
     """
-    waveform: Waveform
     """Data containing the harmonics of the waveform, defined by a list of amplitudes and a list
     of frequencies
     """
     harmonics: Optional[Harmonics] = None
     processed: Optional[Processed] = None
+    waveform: Optional[Waveform] = None
 
 
 class OperationPointExcitation(BaseModel):
@@ -201,6 +207,7 @@ class OperationPointExcitation(BaseModel):
     current: Optional[ElectromagneticParameter] = None
     magneticField: Optional[ElectromagneticParameter] = None
     magneticFluxDensity: Optional[ElectromagneticParameter] = None
+    magnetizingCurrent: Optional[ElectromagneticParameter] = None
     """A label that identifies this Operation Point"""
     name: Optional[str] = None
     voltage: Optional[ElectromagneticParameter] = None
@@ -222,7 +229,7 @@ class OperationPoint(BaseModel):
     excitations for all ports
     """
     conditions: OperationConditions
-    windingExcitations: List[OperationPointExcitationPerWinding]
+    excitationsPerWinding: List[OperationPointExcitationPerWinding]
     """Name describing this operation point"""
     name: Optional[str] = None
 
@@ -398,26 +405,8 @@ class MaterialComposition(Enum):
     amorphous = "amorphous"
     electricalSteel = "electricalSteel"
     ferrite = "ferrite"
+    ironPowder = "ironPowder"
     nanocrystaline = "nanocrystaline"
-    powder = "powder"
-
-
-class PermeabilityPoint(BaseModel):
-    class Config:  
-        use_enum_values = True
-    """data for describing one point of permebility"""
-    """Permeability value"""
-    value: float
-    """Frequency of the Magnetic field, in Hz"""
-    frequency: Optional[float] = None
-    """DC bias in the magnetic field, in A/m"""
-    magneticFieldBias: Optional[float] = None
-    """magnetic flux density peak for the field value, in T"""
-    magneticFluxDensityPeak: Optional[float] = None
-    """temperature for the field value, in Celsius"""
-    temperature: Optional[float] = None
-    """tolerance for the field value"""
-    tolerance: Optional[float] = None
 
 
 class FrequencyFactor(BaseModel):
@@ -426,22 +415,22 @@ class FrequencyFactor(BaseModel):
     """Field with the coefficients used to calculate how much the permeability decreases with
     the frequency, as factor = a + b * f + c * pow(f, 2) + d * pow(f, 3) + e * pow(f, 4)
     """
-    a: Optional[float] = None
-    b: Optional[float] = None
-    c: Optional[float] = None
-    d: Optional[float] = None
-    e: Optional[float] = None
+    a: float
+    b: float
+    c: float
+    d: float
+    e: float
 
 
-class HDcBiasFactor(BaseModel):
+class MagneticFieldDcBiasFactor(BaseModel):
     class Config:  
         use_enum_values = True
     """Field with the coefficients used to calculate how much the permeability decreases with
     the H DC bias, as factor = a + b * pow(H, c)
     """
-    a: Optional[float] = None
-    b: Optional[float] = None
-    c: Optional[float] = None
+    a: float
+    b: float
+    c: float
 
 
 class TemperatureFactor(BaseModel):
@@ -450,11 +439,11 @@ class TemperatureFactor(BaseModel):
     """Field with the coefficients used to calculate how much the permeability decreases with
     the temperature, as factor = a + b * T + c * pow(T, 2) + d * pow(T, 3) + e * pow(T, 4)
     """
-    a: Optional[float] = None
-    b: Optional[float] = None
-    c: Optional[float] = None
-    d: Optional[float] = None
-    e: Optional[float] = None
+    a: float
+    b: float
+    c: float
+    d: float
+    e: float
 
 
 class MagneticsPermeabilityMethodData(BaseModel):
@@ -468,7 +457,7 @@ class MagneticsPermeabilityMethodData(BaseModel):
     """Field with the coefficients used to calculate how much the permeability decreases with
     the H DC bias, as factor = a + b * pow(H, c)
     """
-    hDcBiasFactor: HDcBiasFactor
+    magneticFieldDcBiasFactor: MagneticFieldDcBiasFactor
     """Field with the coefficients used to calculate how much the permeability decreases with
     the frequency, as factor = a + b * f + c * pow(f, 2) + d * pow(f, 3) + e * pow(f, 4)
     """
@@ -481,21 +470,32 @@ class MagneticsPermeabilityMethodData(BaseModel):
     temperatureFactor: Optional[TemperatureFactor] = None
 
 
-class InitialPermeability(BaseModel):
+class PermeabilityPoint(BaseModel):
     class Config:  
         use_enum_values = True
-    value: Union[List[PermeabilityPoint], float]
+    """data for describing one point of permebility"""
+    """Permeability value"""
+    value: float
+    """Frequency of the Magnetic field, in Hz"""
+    frequency: Optional[float] = None
+    """DC bias in the magnetic field, in A/m"""
+    magneticFieldDcBias: Optional[float] = None
+    """magnetic flux density peak for the field value, in T"""
+    magneticFluxDensityPeak: Optional[float] = None
     """The initial permeability of a magnetic material according to its manufacturer"""
     modifiers: Optional[Dict[str, MagneticsPermeabilityMethodData]] = None
+    """temperature for the field value, in Celsius"""
+    temperature: Optional[float] = None
+    """tolerance for the field value"""
+    tolerance: Optional[float] = None
 
 
-class Permeability(BaseModel):
+class Permeabilities(BaseModel):
     class Config:  
         use_enum_values = True
     """The data regarding the relative permeability of a magnetic material"""
-    initial: InitialPermeability
-    """The amplitude permeability of a magnetic material according to its manufacturer"""
-    amplitude: Optional[List[PermeabilityPoint]] = None
+    amplitude: Union[List[PermeabilityPoint], PermeabilityPoint, None]
+    initial: Union[List[PermeabilityPoint], PermeabilityPoint]
 
 
 class CoreMaterialType(Enum):
@@ -512,14 +512,13 @@ class VolumetricLossesPoint(BaseModel):
     
     List of volumetric losses points
     """
-    """frequency value, in Hz"""
-    frequency: float
-    """magnetic flux density value, in T"""
-    magneticFluxDensity: float
+    magneticFluxDensity: OperationPointExcitation
+    """origin of the data"""
+    origin: str
     """temperature value, in Celsius"""
     temperature: float
-    """voluemtric losses value, in W/m3"""
-    volumetricLosses: float
+    """volumetric losses value, in W/m3"""
+    value: float
 
 
 class SteinmetzCoreLossesMethodRangeDatum(BaseModel):
@@ -583,7 +582,7 @@ class CoreMaterial(BaseModel):
     """The name of a magnetic material"""
     name: str
     """The data regarding the relative permeability of a magnetic material"""
-    permeability: Permeability
+    permeability: Permeabilities
     """BH Cycle points where a non-negligible increase in magnetic field produces a negligible
     increase of magnetic flux density
     """
@@ -593,6 +592,8 @@ class CoreMaterial(BaseModel):
     """The data regarding the volumetric losses of a magnetic material"""
     volumetricLosses: Dict[str, List[Union[List[VolumetricLossesPoint], CoreLossesMethodData]]]
     bhCycle: Optional[List[SaturationElement]] = None
+    """The temperature at which this material losses all ferromagnetism"""
+    curieTemperature: Optional[float] = None
     """The family of a magnetic material according to its manufacturer"""
     family: Optional[str] = None
 

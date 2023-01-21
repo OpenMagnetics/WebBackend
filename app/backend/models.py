@@ -128,6 +128,10 @@ class Username(BaseModel):
     username: Optional[str] = None
 
 
+class MaterialNameOnly(BaseModel):
+    name: str
+
+
 class BugReport(BaseModel):
     userDataDump: dict
     userInformation: Optional[str] = None

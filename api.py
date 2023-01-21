@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
-from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport
-from app.backend.core_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription
+from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport, MaterialNameOnly
+from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import pandas
@@ -103,6 +103,7 @@ app = FastAPI()
 origins = [
     "https://openmagnetics.com",
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:4173",
 ]
 
@@ -520,6 +521,13 @@ def core_compute_core_parameters(core: MagneticCore):
     pprint.pprint("core_datum")
     pprint.pprint(core_datum)
     return core_datum
+
+
+@app.post("/get_material_data")
+def get_material_data(material: MaterialNameOnly):
+    material = material.dict()
+    material_data = PyMKF.get_material_data(material['name'])
+    return material_data
 
 
 @app.post("/core_compute_gap_reluctances")
