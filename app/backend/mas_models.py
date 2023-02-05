@@ -213,15 +213,6 @@ class OperationPointExcitation(BaseModel):
     voltage: Optional[ElectromagneticParameter] = None
 
 
-class OperationPointExcitationPerWinding(BaseModel):
-    class Config:  
-        use_enum_values = True
-    """Data describing the excitation of one port of a magnetic for a given operation point"""
-    """Data describing the excitation of the winding"""
-    excitation: OperationPointExcitation
-    winding: str
-
-
 class OperationPoint(BaseModel):
     class Config:  
         use_enum_values = True
@@ -229,7 +220,7 @@ class OperationPoint(BaseModel):
     excitations for all ports
     """
     conditions: OperationConditions
-    excitationsPerWinding: List[OperationPointExcitationPerWinding]
+    excitationsPerWinding: List[OperationPointExcitation]
     """Name describing this operation point"""
     name: Optional[str] = None
 

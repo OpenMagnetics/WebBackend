@@ -380,7 +380,6 @@ class RoadmapVotesTable(Database):
         query = self.session.query(self.Table.milestone_id, sqlalchemy.func.count(self.Table.milestone_id).label("count"))
         query = query.group_by(self.Table.milestone_id).order_by(sqlalchemy.desc("count"))
         data = pandas.read_sql(query.statement, query.session.bind)
-        # data = engine.execute(query).fetchall()
         self.disconnect()
         return data
 
@@ -397,6 +396,7 @@ class RoadmapVotesTable(Database):
         self.session.commit()
         query = self.session.query(self.Table)
         data = pandas.read_sql(query.statement, query.session.bind)
+        print(data)
         self.disconnect()
         return True
 

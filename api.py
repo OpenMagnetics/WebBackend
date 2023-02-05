@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport, MaterialNameOnly
-from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription
+from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import pandas
@@ -427,18 +427,20 @@ def core_compute_core_3d_model(core: MagneticCore):
     core = core.dict()
 
     core = clean_dimensions(core)
-    # pprint.pprint("core")
-    # pprint.pprint(core)
+    if not isinstance(core['functionalDescription']['material'], str):
+        core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
     core['geometricalDescription'] = None
     core['processedDescription'] = None
+    # pprint.pprint("core")
+    # pprint.pprint(core)
     core_datum = PyMKF.get_core_data(core, False)
     # pprint.pprint("core_datum")
     # pprint.pprint(core_datum)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
                                                   geometrical_description=core_datum['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
-    print(step_path)
-    print(obj_path)
+    # print(step_path)
+    # print(obj_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -457,8 +459,8 @@ def core_compute_core_3d_model_stp(core: MagneticCore):
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
                                                   geometrical_description=core_datum['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
-    print(step_path)
-    print(obj_path)
+    # print(step_path)
+    # print(obj_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -485,6 +487,7 @@ def core_compute_technical_drawing(coreShape: CoreShape):
 def core_compute_gapping_technical_drawing(core: MagneticCore):
     core = core.dict()
 
+    # pprint.pprint(core)
     core_datum = PyMKF.get_core_data(core, False)
     # pprint.pprint(core)
 
@@ -513,13 +516,13 @@ def core_compute_gapping_technical_drawing(core: MagneticCore):
 def core_compute_core_parameters(core: MagneticCore):
     # pprint.pprint("core_compute_core_parameters")
     core = core.dict()
-    pprint.pprint("core")
-    pprint.pprint(core)
+    # pprint.pprint("core")
+    # pprint.pprint(core)
     if not isinstance(core['functionalDescription']['shape'], str):
         core = clean_dimensions(core)
     core_datum = PyMKF.get_core_data(core, False)
-    pprint.pprint("core_datum")
-    pprint.pprint(core_datum)
+    # pprint.pprint("core_datum")
+    # pprint.pprint(core_datum)
     return core_datum
 
 
@@ -552,3 +555,29 @@ def get_constants():
 def get_gap_reluctance_models():
     models_info = PyMKF.get_gap_reluctance_model_information()
     return models_info
+
+
+@app.post("/get_inductance_from_number_turns_and_gapping")
+# async def get_inductance_from_number_turns_and_gapping(request: Request):
+#     json = await request.json()
+#     pprint.pprint("json")
+#     pprint.pprint(json)
+#     Mas(**json)
+#     assert 0
+# def get_inductance_from_number_turns_and_gapping(simulation: Mas):
+async def get_inductance_from_number_turns_and_gapping(request: Request):
+    json = await request.json()
+    models = json["models"]
+    simulation = Mas(**json["simulation"])
+
+    # pprint.pprint(models)
+
+    simulation = simulation.dict()
+    # pprint.pprint(simulation['magnetic']['core'])
+    # pprint.pprint(simulation['magnetic']['winding'])
+    # pprint.pprint(simulation['inputs']['operationPoints'][0])
+    inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
+                                                                    simulation['magnetic']['winding'],
+                                                                    simulation['inputs']['operationPoints'][0],
+                                                                    models)
+    return inductance
