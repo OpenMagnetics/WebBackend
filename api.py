@@ -558,14 +558,29 @@ def get_gap_reluctance_models():
 
 
 @app.post("/get_inductance_from_number_turns_and_gapping")
-# async def get_inductance_from_number_turns_and_gapping(request: Request):
-#     json = await request.json()
-#     pprint.pprint("json")
-#     pprint.pprint(json)
-#     Mas(**json)
-#     assert 0
-# def get_inductance_from_number_turns_and_gapping(simulation: Mas):
 async def get_inductance_from_number_turns_and_gapping(request: Request):
+    json = await request.json()
+    models = json["models"]
+    simulation = Mas(**json["simulation"])
+
+
+    simulation = simulation.dict()
+    try:
+        inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
+                                                                    simulation['magnetic']['winding'],
+                                                                    simulation['inputs']['operationPoints'][0],
+                                                                    models)
+    except RuntimeError:
+        pprint.pprint(models)
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['magnetic']['winding'])
+        pprint.pprint(simulation['inputs']['operationPoints'][0])
+
+    return inductance
+
+
+@app.post("/get_number_turns_from_gapping_and_inductance")
+async def get_number_turns_from_gapping_and_inductance(request: Request):
     json = await request.json()
     models = json["models"]
     simulation = Mas(**json["simulation"])
@@ -576,8 +591,47 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
     # pprint.pprint(simulation['magnetic']['core'])
     # pprint.pprint(simulation['magnetic']['winding'])
     # pprint.pprint(simulation['inputs']['operationPoints'][0])
-    inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
-                                                                    simulation['magnetic']['winding'],
-                                                                    simulation['inputs']['operationPoints'][0],
+    try:
+        inductance = PyMKF.get_number_turns_from_gapping_and_inductance(simulation['magnetic']['core'],
+                                                                    simulation['inputs'],
                                                                     models)
+    except RuntimeError:
+        pprint.pprint(models)
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['inputs'])
     return inductance
+
+
+@app.post("/get_gapping_from_number_turns_and_inductance")
+async def get_gapping_from_number_turns_and_inductance(request: Request):
+    json = await request.json()
+    models = json["models"]
+    gappingType = json["gappingType"]
+    simulation = Mas(**json["simulation"])
+
+    # pprint.pprint(models)
+
+    simulation = simulation.dict()
+    # pprint.pprint(simulation['magnetic']['core']['functionalDescription']['shape'])
+    # pprint.pprint(simulation['magnetic']['winding'])
+    # pprint.pprint(simulation['inputs'])
+    # pprint.pprint(gappingType)
+    try:
+        gapping = PyMKF.get_gapping_from_number_turns_and_inductance(simulation['magnetic']['core'],
+                                                                 simulation['magnetic']['winding'],
+                                                                 simulation['inputs'],
+                                                                 gappingType,
+                                                                 4,
+                                                                 models)
+    except RuntimeError:
+        pprint.pprint(models)
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['magnetic']['winding'])
+        pprint.pprint(simulation['inputs'])
+        pprint.pprint(gappingType)
+    core = simulation['magnetic']['core']
+    pprint.pprint(gapping)
+    core['functionalDescription']['gapping'] = gapping
+    core_datum = PyMKF.get_core_data(core, False)
+
+    return core_datum
