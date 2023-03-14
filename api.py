@@ -476,6 +476,7 @@ def core_compute_technical_drawing(coreShape: CoreShape):
         "projection_color": "#d4d4d4",
         "dimension_color": "#d4d4d4"
     }
+    pprint.pprint(coreShape)
     views = core_builder.get_piece_technical_drawing(coreShape, colors)
     if views['top_view'] is None or views['front_view'] is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
@@ -567,9 +568,9 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
     simulation = simulation.dict()
     try:
         inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
-                                                                    simulation['magnetic']['winding'],
-                                                                    simulation['inputs']['operationPoints'][0],
-                                                                    models)
+                                                                        simulation['magnetic']['winding'],
+                                                                        simulation['inputs']['operationPoints'][0],
+                                                                        models)
     except RuntimeError:
         pprint.pprint(models)
         pprint.pprint(simulation['magnetic']['core'])
@@ -593,8 +594,8 @@ async def get_number_turns_from_gapping_and_inductance(request: Request):
     # pprint.pprint(simulation['inputs']['operationPoints'][0])
     try:
         inductance = PyMKF.get_number_turns_from_gapping_and_inductance(simulation['magnetic']['core'],
-                                                                    simulation['inputs'],
-                                                                    models)
+                                                                        simulation['inputs'],
+                                                                        models)
     except RuntimeError:
         pprint.pprint(models)
         pprint.pprint(simulation['magnetic']['core'])
@@ -618,20 +619,66 @@ async def get_gapping_from_number_turns_and_inductance(request: Request):
     # pprint.pprint(gappingType)
     try:
         gapping = PyMKF.get_gapping_from_number_turns_and_inductance(simulation['magnetic']['core'],
-                                                                 simulation['magnetic']['winding'],
-                                                                 simulation['inputs'],
-                                                                 gappingType,
-                                                                 4,
-                                                                 models)
+                                                                     simulation['magnetic']['winding'],
+                                                                     simulation['inputs'],
+                                                                     gappingType,
+                                                                     4,
+                                                                     models)
+        core = simulation['magnetic']['core']
+        pprint.pprint(gapping)
+        core['functionalDescription']['gapping'] = gapping
+        core_datum = PyMKF.get_core_data(core, False)
+
+        return core_datum
     except RuntimeError:
         pprint.pprint(models)
         pprint.pprint(simulation['magnetic']['core'])
         pprint.pprint(simulation['magnetic']['winding'])
         pprint.pprint(simulation['inputs'])
         pprint.pprint(gappingType)
-    core = simulation['magnetic']['core']
-    pprint.pprint(gapping)
-    core['functionalDescription']['gapping'] = gapping
-    core_datum = PyMKF.get_core_data(core, False)
+    
 
-    return core_datum
+
+@app.post("/get_core_losses")
+async def get_core_losses(request: Request):
+    json = await request.json()
+    models = json["models"]
+    simulation = Mas(**json["simulation"])
+    simulation = simulation.dict()
+
+    # pprint.pprint("models")
+    # pprint.pprint(models)
+    # del simulation['magnetic']['core']['processedDescription']
+    # del simulation['magnetic']['core']['geometricalDescription']
+
+    # pprint.pprint(simulation['magnetic']['core'])
+    # pprint.pprint(simulation['magnetic']['winding'])
+    # pprint.pprint(simulation['inputs']['operationPoints'][0])
+
+
+    try:
+        core_losses_result = PyMKF.get_core_losses(simulation['magnetic']['core'],
+                                                   simulation['magnetic']['winding'],
+                                                   simulation['inputs']['operationPoints'][0],
+                                                   models)
+        # pprint.pprint(core_losses_result)
+        return core_losses_result
+
+    except (RuntimeError, TypeError):
+        pprint.pprint(models)
+        del simulation['magnetic']['core']['processedDescription']
+        del simulation['magnetic']['core']['geometricalDescription']
+
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['magnetic']['winding'])
+        pprint.pprint(simulation['inputs']['operationPoints'][0])
+
+    
+
+@app.post("/get_core_losses_models")
+async def get_core_losses_models(request: Request):
+    json = await request.json()
+    print(json)
+    models_info = PyMKF.get_core_losses_model_information(json['materialName'])
+    print(models_info)
+    return models_info
