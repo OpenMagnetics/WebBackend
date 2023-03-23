@@ -62,10 +62,7 @@ def flatten_dimensions(data):
                 v["nominal"] = v["maximum"]
             else:
                 v["nominal"] = round((v["maximum"] + v["minimum"]) / 2, 6)
-    dim = {}
-    for k, v in dimensions.items():
-        dim[k] = v["nominal"]
-
+    dim = {k: v["nominal"] for k, v in dimensions.items()}
     data["dimensions"] = dim
     return data
 
@@ -145,9 +142,8 @@ def cast_vote(data: Vote):
     roadmap_votes_table = RoadmapVotesTable()
     if roadmap_votes_table.is_vote_casted(**data.dict()):
         return {"voted": False}
-    else:
-        vote = roadmap_votes_table.insert_vote(**data.dict())
-        return {"voted": vote}
+    vote = roadmap_votes_table.insert_vote(**data.dict())
+    return {"voted": vote}
 
 
 @app.post("/get_notifications")
@@ -170,13 +166,12 @@ def report_bug(data: BugReport):
 def login(data: UserLogin):
     data = data.dict()
     user_table = UsersTable()
-    if user_table.username_exists(data['username']):
-        if user_table.check_password(data['username'], data['password']):
-            return{"status": "logged in", "username": data['username']}
-        else:
-            return{"status": "wrong password"}
-    else:
+    if not user_table.username_exists(data['username']):
         return{"status": "unknown username", "username": data['username']}
+    if user_table.check_password(data['username'], data['password']):
+        return{"status": "logged in", "username": data['username']}
+    else:
+        return{"status": "wrong password"}
 
 
 @app.post("/register")
@@ -235,9 +230,8 @@ def operation_point_publish(data: OperationPointSlug, request: Request):
     slug = data["slug"]
     if slugs_table.slug_exists(slug):
         return {"status": "slug exists", "slug": slug}
-    else:
-        slugs_table.insert_slug(slug, username)
-        return {"status": "published", "slug": slug}
+    slugs_table.insert_slug(slug, username)
+    return {"status": "published", "slug": slug}
 
 
 @app.post("/operation_point_load")
@@ -278,23 +272,18 @@ def operation_point_load(username: Username, request: Request, element_id_or_slu
                 table.create_user_collection(username)
 
             result = table.get_data_by_id(username, element_id_or_slug)
-            result = result.where(pandas.notnull(result), None)
-            result["_id"] = result["_id"].astype(str)
-            return {"element": result.to_dict('records')[0]}
-
         else:
             slugs_table = get_table_slug(request.url._url)
 
-            if slugs_table.slug_exists(element_id_or_slug):
-                username = slugs_table.get_slug_username(element_id_or_slug)
-                if not table.user_collection_exists(username):
-                    return None
-                result = table.get_data_by_slug(username, element_id_or_slug)
-                result = result.where(pandas.notnull(result), None)
-                result["_id"] = result["_id"].astype(str)
-                return {"element": result.to_dict('records')[0]}
-            else:
+            if not slugs_table.slug_exists(element_id_or_slug):
                 return None
+            username = slugs_table.get_slug_username(element_id_or_slug)
+            if not table.user_collection_exists(username):
+                return None
+            result = table.get_data_by_slug(username, element_id_or_slug)
+        result = result.where(pandas.notnull(result), None)
+        result["_id"] = result["_id"].astype(str)
+        return {"element": result.to_dict('records')[0]}
 
 
 @app.post("/operation_point_count")
@@ -327,25 +316,21 @@ def operation_point_delete(username: Username, request: Request, element_id: str
 
     if not table.user_collection_exists(username):
         return {"id": None}
-    else:
-        result = table.delete_data_by_id(username, element_id)
+    result = table.delete_data_by_id(username, element_id)
 
-        # Clean slugs
-        operation_points_slugs_table = OperationPointSlugsTable()
-        slugs = operation_points_slugs_table.get_all_slugs()
-        slugs_by_username = slugs.groupby(["username"])
-        for username, group in slugs_by_username:
-            data = table.get_data_by_username(username)
-            if not data.empty and "slug" in data:
-                slugs_in_username = list(data["slug"].values)
-                for index, row in group.iterrows():
-                    if row["slug"] not in slugs_in_username:
-                        print("Slug to delete:", row["slug"])
-                        operation_points_slugs_table.delete_slug(row["slug"])
-        if result["result"]:
-            return {"id": result["id"]}
-        else:
-            return {"id": None}
+    # Clean slugs
+    operation_points_slugs_table = OperationPointSlugsTable()
+    slugs = operation_points_slugs_table.get_all_slugs()
+    slugs_by_username = slugs.groupby(["username"])
+    for username, group in slugs_by_username:
+        data = table.get_data_by_username(username)
+        if not data.empty and "slug" in data:
+            slugs_in_username = list(data["slug"].values)
+            for index, row in group.iterrows():
+                if row["slug"] not in slugs_in_username:
+                    print("Slug to delete:", row["slug"])
+                    operation_points_slugs_table.delete_slug(row["slug"])
+    return {"id": result["id"]} if result["result"] else {"id": None}
 
 
 @app.post("/core_get_families")
@@ -508,12 +493,6 @@ def core_compute_gapping_technical_drawing(core: MagneticCore):
 
 
 @app.post("/core_compute_core_parameters")
-# async def core_compute_core_parameters(request: Request):
-#     json = await request.json()
-#     pprint.pprint("json")
-#     pprint.pprint(json)
-#     MagneticCore(**json)
-#     assert 0
 def core_compute_core_parameters(core: MagneticCore):
     # pprint.pprint("core_compute_core_parameters")
     core = core.dict()
@@ -521,17 +500,13 @@ def core_compute_core_parameters(core: MagneticCore):
     # pprint.pprint(core)
     if not isinstance(core['functionalDescription']['shape'], str):
         core = clean_dimensions(core)
-    core_datum = PyMKF.get_core_data(core, False)
-    # pprint.pprint("core_datum")
-    # pprint.pprint(core_datum)
-    return core_datum
+    return PyMKF.get_core_data(core, False)
 
 
 @app.post("/get_material_data")
 def get_material_data(material: MaterialNameOnly):
     material = material.dict()
-    material_data = PyMKF.get_material_data(material['name'])
-    return material_data
+    return PyMKF.get_material_data(material['name'])
 
 
 @app.post("/core_compute_gap_reluctances")
@@ -539,23 +514,22 @@ async def core_compute_gap_reluctances(request: Request):
     json = await request.json()
     model = json["model"]
     gapping = json["gapping"]
-    gapping_data = []
-    for index in range(0, len(gapping)):
-        gapping_data.append(PyMKF.get_gap_reluctance(gapping[index], model.upper().replace(" ", "_")))
-
-    return gapping_data
+    return [
+        PyMKF.get_gap_reluctance(
+            gapping[index], model.upper().replace(" ", "_")
+        )
+        for index in range(len(gapping))
+    ]
 
 
 @app.post("/get_constants")
 def get_constants():
-    constants = PyMKF.get_constants()
-    return constants
+    return PyMKF.get_constants()
 
 
 @app.post("/get_gap_reluctance_models")
 def get_gap_reluctance_models():
-    models_info = PyMKF.get_gap_reluctance_model_information()
-    return models_info
+    return PyMKF.get_gap_reluctance_model_information()
 
 
 @app.post("/get_inductance_from_number_turns_and_gapping")
@@ -563,7 +537,6 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
     json = await request.json()
     models = json["models"]
     simulation = Mas(**json["simulation"])
-
 
     simulation = simulation.dict()
     try:
@@ -627,9 +600,7 @@ async def get_gapping_from_number_turns_and_inductance(request: Request):
         core = simulation['magnetic']['core']
         pprint.pprint(gapping)
         core['functionalDescription']['gapping'] = gapping
-        core_datum = PyMKF.get_core_data(core, False)
-
-        return core_datum
+        return PyMKF.get_core_data(core, False)
     except RuntimeError:
         pprint.pprint(models)
         pprint.pprint(simulation['magnetic']['core'])
@@ -657,13 +628,12 @@ async def get_core_losses(request: Request):
 
 
     try:
-        core_losses_result = PyMKF.get_core_losses(simulation['magnetic']['core'],
-                                                   simulation['magnetic']['winding'],
-                                                   simulation['inputs']['operationPoints'][0],
-                                                   models)
-        # pprint.pprint(core_losses_result)
-        return core_losses_result
-
+        return PyMKF.get_core_losses(
+            simulation['magnetic']['core'],
+            simulation['magnetic']['winding'],
+            simulation['inputs'],
+            models,
+        )
     except (RuntimeError, TypeError):
         pprint.pprint(models)
         del simulation['magnetic']['core']['processedDescription']
@@ -671,7 +641,7 @@ async def get_core_losses(request: Request):
 
         pprint.pprint(simulation['magnetic']['core'])
         pprint.pprint(simulation['magnetic']['winding'])
-        pprint.pprint(simulation['inputs']['operationPoints'][0])
+        pprint.pprint(simulation['inputs'])
 
     
 
@@ -680,5 +650,12 @@ async def get_core_losses_models(request: Request):
     json = await request.json()
     print(json)
     models_info = PyMKF.get_core_losses_model_information(json['materialName'])
+    print(models_info)
+    return models_info
+    
+
+@app.post("/get_core_temperature_models")
+def get_core_temperature_models():
+    models_info = PyMKF.get_core_temperature_model_information()
     print(models_info)
     return models_info

@@ -218,10 +218,7 @@ class UsersTable(Database):
         else:
             query = self.session.query(self.Table).filter(self.Table.id == user_id)
         data = pandas.read_sql(query.statement, query.session.bind)
-        if not data.empty:
-            user_id = data.iloc[0]['id']
-        else:
-            user_id = None
+        user_id = None if data.empty else data.iloc[0]['id']
         self.disconnect()
         return user_id
 
@@ -229,10 +226,7 @@ class UsersTable(Database):
         self.connect()
         query = self.session.query(self.Table).filter(self.Table.username == username)
         data = pandas.read_sql(query.statement, query.session.bind)
-        if not data.empty:
-            hashed_password = data.iloc[0]['password']
-        else:
-            hashed_password = None
+        hashed_password = None if data.empty else data.iloc[0]['password']
         match = bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8'))
         self.disconnect()
         return match
@@ -241,10 +235,7 @@ class UsersTable(Database):
         self.connect()
         query = self.session.query(self.Table).filter(self.Table.id == user_id)
         data = pandas.read_sql(query.statement, query.session.bind)
-        if not data.empty:
-            username = data.iloc[0]['username']
-        else:
-            username = None
+        username = None if data.empty else data.iloc[0]['username']
         self.disconnect()
         return username
 
@@ -370,10 +361,7 @@ class RoadmapVotesTable(Database):
         query = self.session.query(sqlalchemy.func.count()).filter(self.Table.milestone_id == milestone_id)
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
-        if data.empty:
-            return 0
-        else:
-            return int(data.values[0][0])
+        return 0 if data.empty else int(data.values[0][0])
 
     def get_all_number_votes(self):
         self.connect()
@@ -417,20 +405,14 @@ class SlugsTable(Database):
         query = self.session.query(self.Table.username).filter(self.Table.slug == slug)
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
-        if data.empty:
-            return 0
-        else:
-            return data.values[0][0]
+        return 0 if data.empty else data.values[0][0]
 
     def get_all_slugs(self):
         self.connect()
         query = self.session.query(self.Table)
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
-        if data.empty:
-            return 0
-        else:
-            return data
+        return 0 if data.empty else data
 
     def insert_slug(self, slug, username):
         self.connect()
@@ -621,24 +603,20 @@ class DataTable(Database):
         self.connect()
         _id = ObjectId(id)
         data_read = pandas.DataFrame(self.database[username].find({"_id": _id}))
-        self.disconnect()
-        data_read = data_read.drop('updated_at', axis=1, errors='ignore')
-        data_read = data_read.drop('deleted_at', axis=1, errors='ignore')
-        data_read = data_read.drop('created_at', axis=1, errors='ignore')
-        return data_read
+        return self.clean_time_columns(data_read)
 
     def get_data_by_slug(self, username, slug):
         self.connect()
         data_read = pandas.DataFrame(self.database[username].find({"slug": slug}))
-        self.disconnect()
-        data_read = data_read.drop('updated_at', axis=1, errors='ignore')
-        data_read = data_read.drop('deleted_at', axis=1, errors='ignore')
-        data_read = data_read.drop('created_at', axis=1, errors='ignore')
-        return data_read
+        return self.clean_time_columns(data_read)
 
     def get_data_by_username(self, username):
         self.connect()
         data_read = pandas.DataFrame(self.database[username].find({'deleted_at': {"$eq": None}}))
+        return self.clean_time_columns(data_read)
+
+    # TODO Rename this here and in `get_data_by_id`, `get_data_by_slug` and `get_data_by_username`
+    def clean_time_columns(self, data_read):
         self.disconnect()
         data_read = data_read.drop('updated_at', axis=1, errors='ignore')
         data_read = data_read.drop('deleted_at', axis=1, errors='ignore')
