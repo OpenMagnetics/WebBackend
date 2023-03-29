@@ -531,13 +531,16 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
 
     simulation = simulation.dict()
 
-
     try:
         inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
                                                                         simulation['magnetic']['winding'],
                                                                         simulation['inputs']['operationPoints'][0],
                                                                         models)
     except RuntimeError:
+        pprint.pprint(models)
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['magnetic']['winding'])
+        pprint.pprint(simulation['inputs']['operationPoints'][0])
 
     return inductance
 
@@ -548,13 +551,15 @@ async def get_number_turns_from_gapping_and_inductance(request: Request):
     models = json["models"]
     simulation = Mas(**json["simulation"])
 
-
     simulation = simulation.dict()
     try:
         inductance = PyMKF.get_number_turns_from_gapping_and_inductance(simulation['magnetic']['core'],
                                                                         simulation['inputs'],
                                                                         models)
     except RuntimeError:
+        pprint.pprint(models)
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['inputs'])
     return inductance
 
 
@@ -564,7 +569,6 @@ async def get_gapping_from_number_turns_and_inductance(request: Request):
     models = json["models"]
     gappingType = json["gappingType"]
     simulation = Mas(**json["simulation"])
-
 
     simulation = simulation.dict()
     try:
@@ -578,6 +582,11 @@ async def get_gapping_from_number_turns_and_inductance(request: Request):
         core['functionalDescription']['gapping'] = gapping
         return PyMKF.get_core_data(core, False)
     except RuntimeError:
+        pprint.pprint(models)
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['magnetic']['winding'])
+        pprint.pprint(simulation['inputs'])
+        pprint.pprint(gappingType)
     
 
 
@@ -588,12 +597,6 @@ async def get_core_losses(request: Request):
     simulation = Mas(**json["simulation"])
     simulation = simulation.dict()
 
-    # del simulation['magnetic']['core']['processedDescription']
-    # del simulation['magnetic']['core']['geometricalDescription']
-
-
-
-
     try:
         return PyMKF.get_core_losses(
             simulation['magnetic']['core'],
@@ -602,9 +605,13 @@ async def get_core_losses(request: Request):
             models,
         )
     except (RuntimeError, TypeError):
+        pprint.pprint(models)
         del simulation['magnetic']['core']['processedDescription']
         del simulation['magnetic']['core']['geometricalDescription']
 
+        pprint.pprint(simulation['magnetic']['core'])
+        pprint.pprint(simulation['magnetic']['winding'])
+        pprint.pprint(simulation['inputs'])
 
     
 
