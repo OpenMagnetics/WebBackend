@@ -536,13 +536,15 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
                                                                         simulation['magnetic']['winding'],
                                                                         simulation['inputs']['operationPoints'][0],
                                                                         models)
+        return inductance
     except RuntimeError:
+        pprint.pprint("Inductance error")
         pprint.pprint(models)
         pprint.pprint(simulation['magnetic']['core'])
         pprint.pprint(simulation['magnetic']['winding'])
         pprint.pprint(simulation['inputs']['operationPoints'][0])
+        raise HTTPException(418, "Inductance is a teapot.")
 
-    return inductance
 
 
 @app.post("/get_number_turns_from_gapping_and_inductance")
@@ -556,11 +558,11 @@ async def get_number_turns_from_gapping_and_inductance(request: Request):
         inductance = PyMKF.get_number_turns_from_gapping_and_inductance(simulation['magnetic']['core'],
                                                                         simulation['inputs'],
                                                                         models)
+        return inductance
     except RuntimeError:
         pprint.pprint(models)
         pprint.pprint(simulation['magnetic']['core'])
         pprint.pprint(simulation['inputs'])
-    return inductance
 
 
 @app.post("/get_gapping_from_number_turns_and_inductance")
@@ -597,6 +599,10 @@ async def get_core_losses(request: Request):
     simulation = Mas(**json["simulation"])
     simulation = simulation.dict()
 
+    print(models)
+    print(simulation['magnetic']['core'])
+    print(simulation['magnetic']['winding'])
+    print(simulation['inputs'])
     try:
         return PyMKF.get_core_losses(
             simulation['magnetic']['core'],
@@ -605,13 +611,14 @@ async def get_core_losses(request: Request):
             models,
         )
     except (RuntimeError, TypeError):
-        pprint.pprint(models)
-        del simulation['magnetic']['core']['processedDescription']
-        del simulation['magnetic']['core']['geometricalDescription']
+        # pprint.pprint(models)
+        # del simulation['magnetic']['core']['processedDescription']
+        # del simulation['magnetic']['core']['geometricalDescription']
 
-        pprint.pprint(simulation['magnetic']['core'])
-        pprint.pprint(simulation['magnetic']['winding'])
-        pprint.pprint(simulation['inputs'])
+        # pprint.pprint(simulation['magnetic']['core'])
+        # pprint.pprint(simulation['magnetic']['winding'])
+        # pprint.pprint(simulation['inputs'])
+        raise HTTPException(418, "Core losses is a teapot.")
 
     
 
