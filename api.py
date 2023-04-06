@@ -362,7 +362,7 @@ def core_get_commercial_data():
                 datum["familySubtype"] = str(int(datum["familySubtype"]))
             core = copy.deepcopy(dummyCore)
             if row['family'] in ['t']:
-                continue
+                core['functionalDescription']['type'] = "toroidal"
             if row['family'] in ['ut']:
                 core['functionalDescription']['type'] = "closed shape"
             core['functionalDescription']['shape'] = datum
@@ -417,6 +417,7 @@ def core_compute_core_3d_model(core: MagneticCore):
         core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
     core['geometricalDescription'] = None
     core['processedDescription'] = None
+    # pprint.pprint(core)
     core_datum = PyMKF.get_core_data(core, False)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
                                                   geometrical_description=core_datum['geometricalDescription'],
@@ -599,10 +600,6 @@ async def get_core_losses(request: Request):
     simulation = Mas(**json["simulation"])
     simulation = simulation.dict()
 
-    print(models)
-    print(simulation['magnetic']['core'])
-    print(simulation['magnetic']['winding'])
-    print(simulation['inputs'])
     try:
         return PyMKF.get_core_losses(
             simulation['magnetic']['core'],
@@ -611,13 +608,13 @@ async def get_core_losses(request: Request):
             models,
         )
     except (RuntimeError, TypeError):
-        # pprint.pprint(models)
-        # del simulation['magnetic']['core']['processedDescription']
-        # del simulation['magnetic']['core']['geometricalDescription']
+        del simulation['magnetic']['core']['processedDescription']
+        del simulation['magnetic']['core']['geometricalDescription']
 
-        # pprint.pprint(simulation['magnetic']['core'])
-        # pprint.pprint(simulation['magnetic']['winding'])
-        # pprint.pprint(simulation['inputs'])
+        print(models)
+        print(simulation['magnetic']['core'])
+        print(simulation['magnetic']['winding'])
+        print(simulation['inputs'])
         raise HTTPException(418, "Core losses is a teapot.")
 
     

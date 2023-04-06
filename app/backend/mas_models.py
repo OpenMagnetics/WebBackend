@@ -601,6 +601,7 @@ class CoreShapeFamily(Enum):
     pm = "pm"
     pq = "pq"
     rm = "rm"
+    t = "t"
     u = "u"
     ui = "ui"
     ur = "ur"
