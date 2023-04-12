@@ -340,9 +340,7 @@ def core_get_families():
 
 @app.post("/core_get_commercial_data")
 def core_get_commercial_data():
-    commercial_shapes = pandas.read_json('../MAS/data/shapes.ndjson', lines=True)
-    commercial_shapes = commercial_shapes.where(pandas.notnull(commercial_shapes), None)
-    commercial_shapes = commercial_shapes.replace({numpy.nan: None})
+    commercial_shapes = PyMKF.get_available_core_shapes()
 
     core_data = pandas.DataFrame()
     dummyCore = {
@@ -355,18 +353,20 @@ def core_get_commercial_data():
             "numberStacks": 1
         }
     }
-    for index, row in commercial_shapes.iterrows():
-        if row['family'] not in ['ui']:
-            datum = flatten_dimensions(row.to_dict()) 
-            if "familySubtype" in datum and datum["familySubtype"] is not None:
-                datum["familySubtype"] = str(int(datum["familySubtype"]))
+    for shape in commercial_shapes:
+        family = shape.split(" ")[0].lower()
+        if family not in ['ui']:
             core = copy.deepcopy(dummyCore)
-            if row['family'] in ['t']:
+            if family in ['t', 'r']:
                 core['functionalDescription']['type'] = "toroidal"
-            if row['family'] in ['ut']:
+            if family in ['ut']:
                 core['functionalDescription']['type'] = "closed shape"
-            core['functionalDescription']['shape'] = datum
-            core_datum = PyMKF.get_core_data(core, False)
+            core['functionalDescription']['shape'] = shape
+            try:
+                core_datum = PyMKF.get_core_data(core, False)
+            except RuntimeError:
+                print(core)
+                raise HTTPException(status_code=418, detail="Error reading list of core shapes")
             core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
     return {"commercial_cores": core_data.to_dict('records')}
@@ -374,11 +374,13 @@ def core_get_commercial_data():
 
 @app.post("/core_get_commercial_materials")
 def core_get_commercial_materials():
-    commercial_materials = pandas.read_json('../MAS/data/materials.ndjson', lines=True)
-    commercial_materials = commercial_materials.where(pandas.notnull(commercial_materials), None)
-    commercial_materials = commercial_materials.replace({numpy.nan: None})
+    commercial_material_names = PyMKF.get_available_core_materials()
 
-    return {"commercial_materials": commercial_materials.to_dict('records')}
+    commercial_materials = [
+        PyMKF.get_material_data(commercial_material_name)
+        for commercial_material_name in commercial_material_names
+    ]
+    return {"commercial_materials": commercial_materials}
 
 
 @app.post("/core_compute_shape_obj")
@@ -539,11 +541,11 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
                                                                         models)
         return inductance
     except RuntimeError:
-        pprint.pprint("Inductance error")
-        pprint.pprint(models)
-        pprint.pprint(simulation['magnetic']['core'])
-        pprint.pprint(simulation['magnetic']['winding'])
-        pprint.pprint(simulation['inputs']['operationPoints'][0])
+        print("Inductance error")
+        print(models)
+        print(simulation['magnetic']['core'])
+        print(simulation['magnetic']['winding'])
+        print(simulation['inputs']['operationPoints'][0])
         raise HTTPException(418, "Inductance is a teapot.")
 
 
