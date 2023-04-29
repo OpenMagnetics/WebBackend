@@ -355,7 +355,7 @@ def core_get_commercial_data():
     }
     for shape in commercial_shapes:
         family = shape.split(" ")[0].lower()
-        if family not in ['ui']:
+        if family not in ['ui', 'pqi']:
             core = copy.deepcopy(dummyCore)
             if family in ['t', 'r']:
                 core['functionalDescription']['type'] = "toroidal"
@@ -364,9 +364,11 @@ def core_get_commercial_data():
             core['functionalDescription']['shape'] = shape
             try:
                 core_datum = PyMKF.get_core_data(core, False)
-            except RuntimeError:
+            except RuntimeError as e:
                 print(core)
-                raise HTTPException(status_code=418, detail="Error reading list of core shapes")
+                raise HTTPException(
+                    status_code=418, detail="Error reading list of core shapes"
+                ) from e
             core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
 
     return {"commercial_cores": core_data.to_dict('records')}
