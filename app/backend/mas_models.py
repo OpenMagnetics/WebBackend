@@ -58,7 +58,6 @@ class PollutionDegree(Enum):
     P3 = "P3"
 
 
-
 class DesignRequirements(BaseModel):
     class Config:  
         use_enum_values = True
@@ -88,7 +87,6 @@ class DesignRequirements(BaseModel):
     pollutionDegree: Optional[PollutionDegree] = None
 
 
-
 class ForcedConvectionCooling(BaseModel):
     class Config:  
         use_enum_values = True
@@ -105,7 +103,6 @@ class ForcedConvectionCooling(BaseModel):
     velocity: Optional[List[float]] = None
 
 
-
 class OperationConditions(BaseModel):
     class Config:  
         use_enum_values = True
@@ -118,7 +115,6 @@ class OperationConditions(BaseModel):
     cooling: Optional[ForcedConvectionCooling] = None
     """A label that identifies this Operation Conditions"""
     name: Optional[str] = None
-
 
 
 class Harmonics(BaseModel):
@@ -142,7 +138,6 @@ class WaveformLabel(Enum):
     square = "square"
     squarewithdeadtime = "square with dead time"
     triangular = "triangular"
-
 
 
 class Processed(BaseModel):
@@ -174,7 +169,6 @@ class Processed(BaseModel):
     thd: Optional[float] = None
 
 
-
 class Waveform(BaseModel):
     class Config:  
         use_enum_values = True
@@ -191,7 +185,6 @@ class Waveform(BaseModel):
     time: Optional[List[float]] = None
 
 
-
 class ElectromagneticParameter(BaseModel):
     class Config:  
         use_enum_values = True
@@ -204,7 +197,6 @@ class ElectromagneticParameter(BaseModel):
     harmonics: Optional[Harmonics] = None
     processed: Optional[Processed] = None
     waveform: Optional[Waveform] = None
-
 
 
 class OperationPointExcitation(BaseModel):
@@ -225,7 +217,6 @@ class OperationPointExcitation(BaseModel):
     voltage: Optional[ElectromagneticParameter] = None
 
 
-
 class OperationPoint(BaseModel):
     class Config:  
         use_enum_values = True
@@ -238,7 +229,6 @@ class OperationPoint(BaseModel):
     name: Optional[str] = None
 
 
-
 class Inputs(BaseModel):
     class Config:  
         use_enum_values = True
@@ -247,6 +237,37 @@ class Inputs(BaseModel):
     designRequirements: DesignRequirements
     """Data describing the operation points"""
     operationPoints: List[OperationPoint]
+
+
+class Utils(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data from the distributor for a given part"""
+    """The name of the distributor of the part"""
+    name: str
+    """The number of individual pieces available in the distributor"""
+    quantity: float
+    """The distributor's reference of this part"""
+    reference: str
+    """The distributor's price for this part"""
+    cost: Optional[float] = None
+    """The country of the distributor of the part"""
+    country: Optional[str] = None
+    """The area where the distributor doistributes"""
+    distributedArea: Optional[str] = None
+    """The distributor's email"""
+    email: Optional[str] = None
+    """The distributor's link"""
+    link: Optional[str] = None
+    """The distributor's phone"""
+    phone: Optional[str] = None
+    """The date that this information was updated"""
+    updatedAt: Optional[str] = None
+
+
+class Coating(Enum):
+    """The coating of the core"""
+    epoxy = "epoxy"
 
 
 class ColumnShape(Enum):
@@ -264,7 +285,6 @@ class GapType(Enum):
     subtractive = "subtractive"
 
 
-
 class CoreGap(BaseModel):
     class Config:  
         use_enum_values = True
@@ -275,7 +295,7 @@ class CoreGap(BaseModel):
     type: GapType
     """Geometrical area of the gap"""
     area: Optional[float] = None
-    """The coordinates of the center of the gap, referred to the center of thw main column"""
+    """The coordinates of the center of the gap, referred to the center of the main column"""
     coordinates: Optional[List[float]] = None
     """The distance where the closest perpendicular surface is. This usually is half the winding
     height
@@ -290,7 +310,6 @@ class CoreGap(BaseModel):
     shape: Optional[ColumnShape] = None
 
 
-
 class SaturationElement(BaseModel):
     class Config:  
         use_enum_values = True
@@ -303,12 +322,42 @@ class SaturationElement(BaseModel):
     temperature: float
 
 
+class DimensionWithTolerance(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Heat capacity value according to manufacturer, in J/Kg/K
+    
+    Heat conductivity value according to manufacturer, in W/m/K
+    
+    The maximum thickness of the insulation around the wire, in m
+    
+    The conducting diameter of the wire, in m
+    
+    The conducting height of the wire, in m
+    
+    The conducting width of the wire, in m
+    
+    The outer diameter of the wire, in m
+    
+    The outer height of the wire, in m
+    
+    The outer width of the wire, in m
+    
+    A dimension of the wire, in m
+    """
+    """The maximum value of the dimension, in m"""
+    maximum: Optional[float] = None
+    """The minimum value of the dimension, in m"""
+    minimum: Optional[float] = None
+    """The nominal value of the dimension, in m"""
+    nominal: Optional[float] = None
+
+
 class Status(Enum):
     """The production status of a part according to its manufacturer"""
     obsolete = "obsolete"
     production = "production"
     prototype = "prototype"
-
 
 
 class ManufacturerInfo(BaseModel):
@@ -319,6 +368,8 @@ class ManufacturerInfo(BaseModel):
     name: str
     """The manufacturer's price for this part"""
     cost: Optional[str] = None
+    """The manufacturer's URL to the datasheet of the product"""
+    datasheetUrl: Optional[str] = None
     """The manufacturer's reference of this part"""
     reference: Optional[str] = None
     """The production status of a part according to its manufacturer"""
@@ -334,19 +385,20 @@ class MaterialComposition(Enum):
     nanocrystalline = "nanocrystalline"
 
 
-
 class FrequencyFactor(BaseModel):
     class Config:  
         use_enum_values = True
     """Field with the coefficients used to calculate how much the permeability decreases with
     the frequency, as factor = a + b * f + c * pow(f, 2) + d * pow(f, 3) + e * pow(f, 4)
+    
+    Field with the coefficients used to calculate how much the permeability decreases with
+    the frequency, as factor = 1 / (a + b * pow(f, c) ) + d
     """
     a: float
     b: float
     c: float
     d: float
-    e: float
-
+    e: Optional[float] = None
 
 
 class MagneticFieldDcBiasFactor(BaseModel):
@@ -354,11 +406,28 @@ class MagneticFieldDcBiasFactor(BaseModel):
         use_enum_values = True
     """Field with the coefficients used to calculate how much the permeability decreases with
     the H DC bias, as factor = a + b * pow(H, c)
+    
+    Field with the coefficients used to calculate how much the permeability decreases with
+    the H DC bias, as factor = a + b * pow(H, c) + d
     """
     a: float
     b: float
     c: float
+    d: Optional[float] = None
 
+
+class MagneticFluxDensityFactor(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Field with the coefficients used to calculate how much the permeability decreases with
+    the B field, as factor = = 1 / ( 1 / ( a + b * pow(B,c)) + 1 / (d * pow(B, e) ) + 1 / f )
+    """
+    a: float
+    b: float
+    c: float
+    d: float
+    e: float
+    f: float
 
 
 class TemperatureFactor(BaseModel):
@@ -366,38 +435,56 @@ class TemperatureFactor(BaseModel):
         use_enum_values = True
     """Field with the coefficients used to calculate how much the permeability decreases with
     the temperature, as factor = a + b * T + c * pow(T, 2) + d * pow(T, 3) + e * pow(T, 4)
+    
+    Field with the coefficients used to calculate how much the permeability decreases with
+    the temperature, as either factor = a * (T -20) * 0.0001 or factor = (a + c * T + e *
+    pow(T, 2)) / (1 + b * T + d * pow(T, 2))
     """
     a: float
-    b: float
-    c: float
-    d: float
-    e: float
+    b: Optional[float] = None
+    c: Optional[float] = None
+    d: Optional[float] = None
+    e: Optional[float] = None
 
 
-
-class MagneticsPermeabilityMethodData(BaseModel):
+class InitialPermeabilitModifier(BaseModel):
     class Config:  
         use_enum_values = True
     """Object where keys are shape families for which this permeability is valid. If missing,
     the variant is valid for all shapes
     
     Coefficients given by Magnetics in order to calculate the permeability of their cores
+    
+    Coefficients given by Micrometals in order to calculate the permeability of their cores
     """
     """Field with the coefficients used to calculate how much the permeability decreases with
     the H DC bias, as factor = a + b * pow(H, c)
+    
+    Field with the coefficients used to calculate how much the permeability decreases with
+    the H DC bias, as factor = a + b * pow(H, c) + d
     """
     magneticFieldDcBiasFactor: MagneticFieldDcBiasFactor
     """Field with the coefficients used to calculate how much the permeability decreases with
     the frequency, as factor = a + b * f + c * pow(f, 2) + d * pow(f, 3) + e * pow(f, 4)
+    
+    Field with the coefficients used to calculate how much the permeability decreases with
+    the frequency, as factor = 1 / (a + b * pow(f, c) ) + d
     """
     frequencyFactor: Optional[FrequencyFactor] = None
     """Name of this method"""
     method: Optional[str] = None
     """Field with the coefficients used to calculate how much the permeability decreases with
     the temperature, as factor = a + b * T + c * pow(T, 2) + d * pow(T, 3) + e * pow(T, 4)
+    
+    Field with the coefficients used to calculate how much the permeability decreases with
+    the temperature, as either factor = a * (T -20) * 0.0001 or factor = (a + c * T + e *
+    pow(T, 2)) / (1 + b * T + d * pow(T, 2))
     """
     temperatureFactor: Optional[TemperatureFactor] = None
-
+    """Field with the coefficients used to calculate how much the permeability decreases with
+    the B field, as factor = = 1 / ( 1 / ( a + b * pow(B,c)) + 1 / (d * pow(B, e) ) + 1 / f )
+    """
+    magneticFluxDensityFactor: Optional[MagneticFluxDensityFactor] = None
 
 
 class PermeabilityPoint(BaseModel):
@@ -413,12 +500,11 @@ class PermeabilityPoint(BaseModel):
     """magnetic flux density peak for the field value, in T"""
     magneticFluxDensityPeak: Optional[float] = None
     """The initial permeability of a magnetic material according to its manufacturer"""
-    modifiers: Optional[Dict[str, MagneticsPermeabilityMethodData]] = None
+    modifiers: Optional[Dict[str, InitialPermeabilitModifier]] = None
     """temperature for the field value, in Celsius"""
     temperature: Optional[float] = None
     """tolerance for the field value"""
     tolerance: Optional[float] = None
-
 
 
 class Permeabilities(BaseModel):
@@ -429,11 +515,20 @@ class Permeabilities(BaseModel):
     initial: Union[PermeabilityPoint, List[PermeabilityPoint]]
 
 
+class ResistivityPoint(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """data for describing one point of resistivity"""
+    """Resistivity value, in Ohm * m"""
+    value: float
+    """temperature for the field value, in Celsius"""
+    temperature: Optional[float] = None
+
+
 class CoreMaterialType(Enum):
     """The type of a magnetic material"""
     commercial = "commercial"
     custom = "custom"
-
 
 
 class VolumetricLossesPoint(BaseModel):
@@ -453,7 +548,6 @@ class VolumetricLossesPoint(BaseModel):
     value: float
 
 
-
 class RoshenAdditionalCoefficients(BaseModel):
     class Config:  
         use_enum_values = True
@@ -465,7 +559,6 @@ class RoshenAdditionalCoefficients(BaseModel):
     resistivityMagneticFluxDensityCoefficient: float
     resistivityOffset: float
     resistivityTemperatureCoefficient: float
-
 
 
 class SteinmetzCoreLossesMethodRangeDatum(BaseModel):
@@ -489,24 +582,16 @@ class SteinmetzCoreLossesMethodRangeDatum(BaseModel):
     minimumFrequency: Optional[float] = None
 
 
-
-class ResistivityPoint(BaseModel):
-    class Config:  
-        use_enum_values = True
-    """data for describing one point of resistivity"""
-    """Resistivity value, in Ohm * m"""
-    value: float
-    """temperature for the field value, in Celsius"""
-    temperature: Optional[float] = None
-
-
-
 class CoreLossesMethodData(BaseModel):
     class Config:  
         use_enum_values = True
     """Steinmetz coefficients for estimating volumetric losses in a given frequency range
     
     Roshen coefficients for estimating volumetric losses
+    
+    Micrometals method for estimating volumetric losses
+    
+    Magnetics method for estimating volumetric losses
     """
     """Name of this method"""
     method: str
@@ -515,15 +600,12 @@ class CoreLossesMethodData(BaseModel):
     the resistivity
     """
     coefficients: Optional[RoshenAdditionalCoefficients] = None
-    """BH Cycle points where the magnetic flux density is 0"""
-    coerciveForce: Optional[List[SaturationElement]] = None
     """List of reference volumetric losses used to estimate excess eddy current losses"""
     referenceVolumetricLosses: Optional[List[VolumetricLossesPoint]] = None
-    """BH Cycle points where the magnetic field is 0"""
-    remanence: Optional[List[SaturationElement]] = None
-    """Resistivity value according to manufacturer"""
-    resistivity: Optional[List[ResistivityPoint]] = None
-
+    a: Optional[float] = None
+    b: Optional[float] = None
+    c: Optional[float] = None
+    d: Optional[float] = None
 
 
 class CoreMaterial(BaseModel):
@@ -537,6 +619,8 @@ class CoreMaterial(BaseModel):
     name: str
     """The data regarding the relative permeability of a magnetic material"""
     permeability: Permeabilities
+    """Resistivity value according to manufacturer"""
+    resistivity: List[ResistivityPoint]
     """BH Cycle points where a non-negligible increase in magnetic field produces a negligible
     increase of magnetic flux density
     """
@@ -546,40 +630,20 @@ class CoreMaterial(BaseModel):
     """The data regarding the volumetric losses of a magnetic material"""
     volumetricLosses: Dict[str, List[Union[CoreLossesMethodData, List[VolumetricLossesPoint]]]]
     bhCycle: Optional[List[SaturationElement]] = None
+    """BH Cycle points where the magnetic flux density is 0"""
+    coerciveForce: Optional[List[SaturationElement]] = None
     """The temperature at which this material losses all ferromagnetism"""
     curieTemperature: Optional[float] = None
+    """Density value according to manufacturer, in kg/m3"""
+    density: Optional[float] = None
     """The family of a magnetic material according to its manufacturer"""
     family: Optional[str] = None
-
-
-
-class DimensionWithTolerance(BaseModel):
-    class Config:  
-        use_enum_values = True
-    """The conducting diameter of the wire, in m
-    
-    The conducting height of the wire, in m
-    
-    The conducting thickness of the wire, in m
-    
-    The conducting width of the wire, in m
-    
-    The outer diameter of the wire, in m
-    
-    The outer height of the wire, in m
-    
-    The outer thickness of the wire, in m
-    
-    The outer width of the wire, in m
-    
-    A dimension of the wire, in m
-    """
-    """The maximum value of the dimension, in m"""
-    maximum: Optional[float] = None
-    """The minimum value of the dimension, in m"""
-    minimum: Optional[float] = None
-    """The nominal value of the dimension, in m"""
-    nominal: Optional[float] = None
+    """Heat capacity value according to manufacturer, in J/Kg/K"""
+    heatCapacity: Optional[DimensionWithTolerance] = None
+    """Heat conductivity value according to manufacturer, in W/m/K"""
+    heatConductivity: Optional[DimensionWithTolerance] = None
+    """BH Cycle points where the magnetic field is 0"""
+    remanence: Optional[List[SaturationElement]] = None
 
 
 class CoreShapeFamily(Enum):
@@ -588,6 +652,7 @@ class CoreShapeFamily(Enum):
     ec = "ec"
     efd = "efd"
     el = "el"
+    elp = "elp"
     ep = "ep"
     epx = "epx"
     eq = "eq"
@@ -600,6 +665,7 @@ class CoreShapeFamily(Enum):
     planarer = "planar er"
     pm = "pm"
     pq = "pq"
+    pqi = "pqi"
     rm = "rm"
     t = "t"
     u = "u"
@@ -623,7 +689,6 @@ class CoreShapeType(Enum):
     """
     custom = "custom"
     standard = "standard"
-
 
 
 class CoreShape(BaseModel):
@@ -656,7 +721,6 @@ class CoreType(Enum):
     twopieceset = "two-piece set"
 
 
-
 class CoreFunctionalDescription(BaseModel):
     class Config:  
         use_enum_values = True
@@ -669,6 +733,8 @@ class CoreFunctionalDescription(BaseModel):
     shape: Union[CoreShape, str]
     """The type of core"""
     type: CoreType
+    """The coating of the core"""
+    coating: Optional[Coating] = None
     """The number of stacked cores"""
     numberStacks: Optional[int] = None
 
@@ -684,7 +750,6 @@ class Composition(Enum):
     teflon = "teflon"
 
 
-
 class DielectricStrengthElement(BaseModel):
     class Config:  
         use_enum_values = True
@@ -697,7 +762,6 @@ class DielectricStrengthElement(BaseModel):
     thickness: Optional[float] = None
 
 
-
 class Rating(BaseModel):
     class Config:  
         use_enum_values = True
@@ -706,7 +770,6 @@ class Rating(BaseModel):
     temperature: Optional[float] = None
     """The voltage rating of the material"""
     voltage: Optional[float] = None
-
 
 
 class InsulationMaterial(BaseModel):
@@ -724,7 +787,6 @@ class InsulationMaterial(BaseModel):
     rating: Optional[Rating] = None
     """The thermal conductivity of the insulation material, in W / m * K"""
     thermalConductivity: Optional[float] = None
-
 
 
 class Piece(BaseModel):
@@ -750,7 +812,6 @@ class CoreGeometricalDescriptionElementType(Enum):
     sheet = "sheet"
     spacer = "spacer"
     toroidal = "toroidal"
-
 
 
 class CoreGeometricalDescriptionElement(BaseModel):
@@ -792,7 +853,6 @@ class ColumnType(Enum):
     lateral = "lateral"
 
 
-
 class ColumnElement(BaseModel):
     class Config:  
         use_enum_values = True
@@ -815,7 +875,6 @@ class ColumnElement(BaseModel):
     width: float
 
 
-
 class EffectiveParameters(BaseModel):
     class Config:  
         use_enum_values = True
@@ -832,7 +891,6 @@ class EffectiveParameters(BaseModel):
     effectiveVolume: float
     """This is the minimum area seen by the magnetic flux along its path"""
     minimumArea: float
-
 
 
 class WindingWindowElement(BaseModel):
@@ -873,7 +931,6 @@ class WindingWindowElement(BaseModel):
     radialHeight: Optional[float] = None
 
 
-
 class CoreProcessedDescription(BaseModel):
     class Config:  
         use_enum_values = True
@@ -891,7 +948,6 @@ class CoreProcessedDescription(BaseModel):
     windingWindows: List[WindingWindowElement]
 
 
-
 class MagneticCore(BaseModel):
     class Config:  
         use_enum_values = True
@@ -903,6 +959,8 @@ class MagneticCore(BaseModel):
     models.
     """
     functionalDescription: CoreFunctionalDescription
+    """The lists of distributors of the magnetic core"""
+    distributorsInfo: Optional[List[Utils]] = None
     """List with data from the core based on its geometrical description, in a way that can be
     used by CAD models.
     """
@@ -914,11 +972,10 @@ class MagneticCore(BaseModel):
     processedDescription: Optional[CoreProcessedDescription] = None
 
 
-class CoreBobbinFamily(Enum):
+class BobbinFamily(Enum):
     """The family of a bobbin"""
     e = "e"
     ec = "ec"
-    eer = "eer"
     efd = "efd"
     el = "el"
     ep = "ep"
@@ -931,37 +988,51 @@ class CoreBobbinFamily(Enum):
     u = "u"
 
 
+class BobbinFunctionalDescription(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """The data from the bobbin based on its function, in a way that can be used by analytical
+    models.
+    """
+    """The dimensions of a bobbin, keys must be as defined in EN 62317"""
+    dimensions: Dict[str, Union[DimensionWithTolerance, float]]
+    """The family of a bobbin"""
+    family: BobbinFamily
+    """The name of a bobbin that this bobbin belongs to"""
+    shape: str
+    """The type of a bobbin"""
+    type: CoreShapeType
+    """The subtype of the shape, in case there are more than one"""
+    familySubtype: Optional[str] = None
 
-class ProcessedData(BaseModel):
+
+class CoreBobbinProcessedDescription(BaseModel):
     class Config:  
         use_enum_values = True
     """TBD, add separators"""
     """The thicknes of the central column wall, where the wire is wound"""
-    columnThickness: Optional[float] = None
+    columnThickness: float
     """The thicknes of the walls that hold the wire on both sides of the column"""
-    wallThickness: Optional[float] = None
+    wallThickness: float
+    """List of winding windows, all elements in the list must be of the same type"""
+    windingWindows: List[WindingWindowElement]
 
 
-
-class CoreBobbin(BaseModel):
+class Bobbin(BaseModel):
     class Config:  
         use_enum_values = True
-    """A shape for the magnetic cores"""
-    """The family of a bobbin"""
-    family: CoreBobbinFamily
-    """The type of a bobbin"""
-    type: CoreShapeType
-    """The dimensions of a bobbin, keys must be as defined in EN 62317"""
-    dimensions: Optional[Dict[str, Union[DimensionWithTolerance, float]]] = None
-    """The subtype of the shape, in case there are more than one"""
-    familySubtype: Optional[str] = None
+    """The description of a bobbin"""
+    """The data from the bobbin based on its function, in a way that can be used by analytical
+    models.
+    """
+    functionalDescription: BobbinFunctionalDescription
+    """The lists of distributors of the magnetic bobbin"""
+    distributorsInfo: Optional[List[Utils]] = None
     manufacturerInfo: Optional[ManufacturerInfo] = None
-    """The name of a bobbin, according to EN 62317"""
+    """The name of bobbin"""
     name: Optional[str] = None
     """TBD, add separators"""
-    processedData: Optional[ProcessedData] = None
-    """The name of a bobbin that this bobbin belongs to"""
-    shape: Optional[str] = None
+    processedDescription: Optional[CoreBobbinProcessedDescription] = None
 
 
 class IsolationSide(Enum):
@@ -990,7 +1061,6 @@ class InsulationWireCoatingType(Enum):
     taped = "taped"
 
 
-
 class InsulationWireCoating(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1002,15 +1072,14 @@ class InsulationWireCoating(BaseModel):
     breakdownVoltage: Optional[float] = None
     """The grade of the insulation around the wire"""
     grade: Optional[int] = None
-    """The maximum thickness of the insulation around the wire, in m"""
-    maximumThickness: Optional[float] = None
     """The number of layers of the insulation around the wire"""
     numberLayers: Optional[int] = None
+    """The maximum thickness of the insulation around the wire, in m"""
+    thickness: Optional[DimensionWithTolerance] = None
     """The thickness of the layers of the insulation around the wire, in m"""
     thicknessLayers: Optional[float] = None
     """The type of the coating"""
     type: Optional[InsulationWireCoatingType] = None
-
 
 
 class Resistivity(BaseModel):
@@ -1025,7 +1094,6 @@ class Resistivity(BaseModel):
     temperatureCoefficient: float
 
 
-
 class ThermalConductivityElement(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1034,7 +1102,6 @@ class ThermalConductivityElement(BaseModel):
     temperature: float
     """Thermal conductivity value, in W / m * K"""
     value: float
-
 
 
 class WireMaterial(BaseModel):
@@ -1049,11 +1116,11 @@ class WireMaterial(BaseModel):
     thermalConductivity: Optional[List[ThermalConductivityElement]] = None
 
 
-class Standard(Enum):
+class WireStandard(Enum):
     """The standard of wire"""
     IEC60317 = "IEC 60317"
     JISC3202 = "JIS C3202"
-    NEMAMW1000C = "NEMA MW 1000C"
+    NEMAMW1000C = "NEMA MW 1000 C"
 
 
 class WireSolidType(Enum):
@@ -1061,7 +1128,6 @@ class WireSolidType(Enum):
     foil = "foil"
     rectangular = "rectangular"
     round = "round"
-
 
 
 class WireSolid(BaseModel):
@@ -1074,8 +1140,6 @@ class WireSolid(BaseModel):
     conductingDiameter: Optional[DimensionWithTolerance] = None
     """The conducting height of the wire, in m"""
     conductingHeight: Optional[DimensionWithTolerance] = None
-    """The conducting thickness of the wire, in m"""
-    conductingThickness: Optional[DimensionWithTolerance] = None
     """The conducting width of the wire, in m"""
     conductingWidth: Optional[DimensionWithTolerance] = None
     manufacturerInfo: Optional[ManufacturerInfo] = None
@@ -1087,15 +1151,14 @@ class WireSolid(BaseModel):
     outerDiameter: Optional[DimensionWithTolerance] = None
     """The outer height of the wire, in m"""
     outerHeight: Optional[DimensionWithTolerance] = None
-    """The outer thickness of the wire, in m"""
-    outerThickness: Optional[DimensionWithTolerance] = None
     """The outer width of the wire, in m"""
     outerWidth: Optional[DimensionWithTolerance] = None
     """The standard of wire"""
-    standard: Optional[Standard] = None
+    standard: Optional[WireStandard] = None
+    """Name according to the standard of wire"""
+    standardName: Optional[str] = None
     """The type of wire"""
     type: Optional[WireSolidType] = None
-
 
 
 class WireS(BaseModel):
@@ -1113,8 +1176,6 @@ class WireS(BaseModel):
     conductingDiameter: Optional[DimensionWithTolerance] = None
     """The conducting height of the wire, in m"""
     conductingHeight: Optional[DimensionWithTolerance] = None
-    """The conducting thickness of the wire, in m"""
-    conductingThickness: Optional[DimensionWithTolerance] = None
     """The conducting width of the wire, in m"""
     conductingWidth: Optional[DimensionWithTolerance] = None
     manufacturerInfo: Optional[ManufacturerInfo] = None
@@ -1126,15 +1187,14 @@ class WireS(BaseModel):
     outerDiameter: Optional[DimensionWithTolerance] = None
     """The outer height of the wire, in m"""
     outerHeight: Optional[DimensionWithTolerance] = None
-    """The outer thickness of the wire, in m"""
-    outerThickness: Optional[DimensionWithTolerance] = None
     """The outer width of the wire, in m"""
     outerWidth: Optional[DimensionWithTolerance] = None
     """The standard of wire"""
-    standard: Optional[Standard] = None
+    standard: Optional[WireStandard] = None
+    """Name according to the standard of wire"""
+    standardName: Optional[str] = None
     """The type of wire"""
     type: Optional[str] = None
-
 
 
 class WindingFunctionalDescription(BaseModel):
@@ -1162,7 +1222,6 @@ class LayersOrientationEnum(Enum):
     vertical = "vertical"
 
 
-
 class PartialWindingElement(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1181,7 +1240,6 @@ class LayersDescriptionType(Enum):
     """Type of the layer"""
     insulation = "insulation"
     wiring = "wiring"
-
 
 
 class LayersDescriptionElement(BaseModel):
@@ -1206,7 +1264,6 @@ class LayersDescriptionElement(BaseModel):
     section: Optional[str] = None
 
 
-
 class SectionsDescriptionElement(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1227,7 +1284,6 @@ class TurnsDescriptionOrientation(Enum):
     """Way in which the turn is wound"""
     clockwire = "clockwire"
     counterClockwise = "counterClockwise"
-
 
 
 class TurnsDescriptionElement(BaseModel):
@@ -1254,7 +1310,6 @@ class TurnsDescriptionElement(BaseModel):
     section: Optional[str] = None
 
 
-
 class Winding(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1262,7 +1317,7 @@ class Winding(BaseModel):
     
     The description of a magnetic winding
     """
-    bobbin: Optional[Union[CoreBobbin, str]] = None
+    bobbin: Optional[Union[Bobbin, str]] = None
     """The data from the winding based on its function, in a way that can be used by analytical
     models of only Magnetism.
     """
@@ -1281,7 +1336,6 @@ class Winding(BaseModel):
     turnsDescription: Optional[List[TurnsDescriptionElement]] = None
 
 
-
 class Magnetic(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1290,7 +1344,6 @@ class Magnetic(BaseModel):
     core: MagneticCore
     """Data describing the winding"""
     winding: Winding
-
 
 
 class Mas(BaseModel):
