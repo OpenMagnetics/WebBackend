@@ -535,6 +535,8 @@ async def get_inductance_from_number_turns_and_gapping(request: Request):
     simulation = Mas(**json["simulation"])
 
     simulation = simulation.dict()
+    if simulation['magnetic']['winding']['bobbin'] is None:
+        simulation['magnetic']['winding']['bobbin'] = "Dummy"
 
     try:
         inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
@@ -559,6 +561,8 @@ async def get_number_turns_from_gapping_and_inductance(request: Request):
     simulation = Mas(**json["simulation"])
 
     simulation = simulation.dict()
+    if simulation['magnetic']['winding']['bobbin'] is None:
+        simulation['magnetic']['winding']['bobbin'] = "Dummy"
     try:
         inductance = PyMKF.get_number_turns_from_gapping_and_inductance(simulation['magnetic']['core'],
                                                                         simulation['inputs'],
@@ -578,6 +582,8 @@ async def get_gapping_from_number_turns_and_inductance(request: Request):
     simulation = Mas(**json["simulation"])
 
     simulation = simulation.dict()
+    if simulation['magnetic']['winding']['bobbin'] is None:
+        simulation['magnetic']['winding']['bobbin'] = "Dummy"
     try:
         gapping = PyMKF.get_gapping_from_number_turns_and_inductance(simulation['magnetic']['core'],
                                                                      simulation['magnetic']['winding'],
@@ -603,6 +609,9 @@ async def get_core_losses(request: Request):
     models = json["models"]
     simulation = Mas(**json["simulation"])
     simulation = simulation.dict()
+
+    if simulation['magnetic']['winding']['bobbin'] is None:
+        simulation['magnetic']['winding']['bobbin'] = "Dummy"
 
     try:
         return PyMKF.get_core_losses(

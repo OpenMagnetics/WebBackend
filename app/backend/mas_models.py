@@ -204,6 +204,10 @@ class OperationPointExcitation(BaseModel):
         use_enum_values = True
     """Data describing the excitation of the winding
     
+    Excitation of the B field that produced the core losses
+    
+    Excitation of the current per winding that produced the winding losses
+    
     The description of a magnetic operation point
     """
     """Frequency of the waveform, common for all electromagnetic parameters, in Hz"""
@@ -381,8 +385,8 @@ class MaterialComposition(Enum):
     amorphous = "amorphous"
     electricalSteel = "electricalSteel"
     ferrite = "ferrite"
-    ironPowder = "ironPowder"
     nanocrystalline = "nanocrystalline"
+    powder = "powder"
 
 
 class FrequencyFactor(BaseModel):
@@ -789,7 +793,7 @@ class InsulationMaterial(BaseModel):
     thermalConductivity: Optional[float] = None
 
 
-class Piece(BaseModel):
+class Machining(BaseModel):
     class Config:  
         use_enum_values = True
     """Data describing the machining applied to a piece"""
@@ -838,7 +842,7 @@ class CoreGeometricalDescriptionElement(BaseModel):
     type: CoreGeometricalDescriptionElementType
     """Material of the spacer"""
     insulationMaterial: Optional[Union[InsulationMaterial, str]] = None
-    machining: Optional[List[Piece]] = None
+    machining: Optional[List[Machining]] = None
     """The rotation of the top of the piece from its original state, referred to the center of
     the main column
     """
@@ -873,6 +877,10 @@ class ColumnElement(BaseModel):
     type: ColumnType
     """Width of the column"""
     width: float
+    """Minimum depth of the column, if irregular"""
+    minimumDepth: Optional[float] = None
+    """Minimum width of the column, if irregular"""
+    minimumWidth: Optional[float] = None
 
 
 class EffectiveParameters(BaseModel):
@@ -1009,29 +1017,32 @@ class BobbinFunctionalDescription(BaseModel):
 class CoreBobbinProcessedDescription(BaseModel):
     class Config:  
         use_enum_values = True
-    """TBD, add separators"""
-    """The thicknes of the central column wall, where the wire is wound"""
+    """The depth of the central column wall, including thickness, in the z axis"""
+    columnDepth: float
+    columnShape: ColumnShape
+    """The thicknes of the central column wall, where the wire is wound, in the X axis"""
     columnThickness: float
     """The thicknes of the walls that hold the wire on both sides of the column"""
     wallThickness: float
     """List of winding windows, all elements in the list must be of the same type"""
     windingWindows: List[WindingWindowElement]
+    """The width of the central column wall, including thickness, in the x axis"""
+    columnWidth: Optional[float] = None
 
 
 class Bobbin(BaseModel):
     class Config:  
         use_enum_values = True
     """The description of a bobbin"""
+    """The lists of distributors of the magnetic bobbin"""
+    distributorsInfo: Optional[List[Utils]] = None
     """The data from the bobbin based on its function, in a way that can be used by analytical
     models.
     """
-    functionalDescription: BobbinFunctionalDescription
-    """The lists of distributors of the magnetic bobbin"""
-    distributorsInfo: Optional[List[Utils]] = None
+    functionalDescription: Optional[BobbinFunctionalDescription] = None
     manufacturerInfo: Optional[ManufacturerInfo] = None
     """The name of bobbin"""
     name: Optional[str] = None
-    """TBD, add separators"""
     processedDescription: Optional[CoreBobbinProcessedDescription] = None
 
 
@@ -1212,7 +1223,7 @@ class WindingFunctionalDescription(BaseModel):
     wire: Union[WireS, str]
 
 
-class LayersOrientationEnum(Enum):
+class OrientationEnum(Enum):
     """Way in which the layer is oriented inside the section
     
     Way in which the layers are oriented inside the section
@@ -1222,18 +1233,24 @@ class LayersOrientationEnum(Enum):
     vertical = "vertical"
 
 
-class PartialWindingElement(BaseModel):
+class PartialWinding(BaseModel):
     class Config:  
         use_enum_values = True
     """Data describing one part of winding, described by a list with the proportion of each
     parallel in the winding that is contained here
     """
-    """Name given to the partial winding"""
-    name: str
     """Number of parallels in winding"""
     parallelsProportion: List[float]
     """The name of the winding that this part belongs to"""
     winding: str
+
+
+class TurnsAlignmentEnum(Enum):
+    """Way in which the turns are aligned inside the layer"""
+    centered = "centered"
+    innerortop = "inner or top"
+    outerorbottom = "outer or bottom"
+    spread = "spread"
 
 
 class LayersDescriptionType(Enum):
@@ -1242,29 +1259,33 @@ class LayersDescriptionType(Enum):
     wiring = "wiring"
 
 
-class LayersDescriptionElement(BaseModel):
+class Layer(BaseModel):
     class Config:  
         use_enum_values = True
     """Data describing one layer in a magnetic"""
-    """The coordinates of the center of the section, referred to the center of the main column"""
+    """The coordinates of the center of the layer, referred to the center of the main column"""
     coordinates: List[float]
-    """Dimensions of the rectangle defining the section"""
+    """Dimensions of the rectangle defining the layer"""
     dimensions: List[float]
     """In case of insulating layer, the material used"""
     insulationMaterial: Optional[Union[InsulationMaterial, str]] = None
     """Name given to the layer"""
     name: str
     """Way in which the layer is oriented inside the section"""
-    orientation: LayersOrientationEnum
-    """List of partial windings in this section"""
-    partialWindings: List[PartialWindingElement]
+    orientation: OrientationEnum
+    """List of partial windings in this layer"""
+    partialWindings: List[PartialWinding]
     """Type of the layer"""
     type: LayersDescriptionType
+    """How much space in this layer is used by wires compared to the total"""
+    fillingFactor: Optional[float] = None
     """The name of the section that this layer belongs to"""
     section: Optional[str] = None
+    """Way in which the turns are aligned inside the layer"""
+    turnsAlignment: Optional[TurnsAlignmentEnum] = None
 
 
-class SectionsDescriptionElement(BaseModel):
+class Section(BaseModel):
     class Config:  
         use_enum_values = True
     """Data describing one section in a magnetic"""
@@ -1273,39 +1294,43 @@ class SectionsDescriptionElement(BaseModel):
     """Dimensions of the rectangle defining the section"""
     dimensions: List[float]
     """Way in which the layers are oriented inside the section"""
-    layersOrientation: LayersOrientationEnum
+    layersOrientation: OrientationEnum
     """Name given to the winding"""
     name: str
     """List of partial windings in this section"""
-    partialWindings: List[PartialWindingElement]
+    partialWindings: List[PartialWinding]
+    """How much space in this section is used by wires compared to the total"""
+    fillingFactor: Optional[float] = None
 
 
-class TurnsDescriptionOrientation(Enum):
+class TurnOrientation(Enum):
     """Way in which the turn is wound"""
-    clockwire = "clockwire"
+    clockwise = "clockwise"
     counterClockwise = "counterClockwise"
 
 
-class TurnsDescriptionElement(BaseModel):
+class Turn(BaseModel):
     class Config:  
         use_enum_values = True
     """Data describing one turn in a magnetic"""
-    """The coordinates of the center of the section, referred to the center of the main column"""
+    """The coordinates of the center of the turn, referred to the center of the main column"""
     coordinates: List[float]
     """The length of the turn, referred from the center of its cross section, in m"""
     length: float
     """Name given to the turn"""
     name: str
-    """The name of the parallel that this turn belongs to"""
-    parallel: str
+    """The index of the parallel that this turn belongs to"""
+    parallel: int
     """The name of the winding that this turn belongs to"""
     winding: str
     """The angle that the turn does, useful for partial turns, in degrees"""
     angle: Optional[float] = None
+    """Dimensions of the rectangle defining the turn"""
+    dimensions: Optional[List[float]] = None
     """The name of the layer that this turn belongs to"""
     layer: Optional[str] = None
     """Way in which the turn is wound"""
-    orientation: Optional[TurnsDescriptionOrientation] = None
+    orientation: Optional[TurnOrientation] = None
     """The name of the section that this turn belongs to"""
     section: Optional[str] = None
 
@@ -1317,7 +1342,7 @@ class Winding(BaseModel):
     
     The description of a magnetic winding
     """
-    bobbin: Optional[Union[Bobbin, str]] = None
+    bobbin: Optional[Union[Bobbin, str]]
     """The data from the winding based on its function, in a way that can be used by analytical
     models of only Magnetism.
     """
@@ -1325,15 +1350,15 @@ class Winding(BaseModel):
     """The data from the winding at the layer level, in a way that can be used by more advanced
     analytical and finite element models
     """
-    layersDescription: Optional[List[LayersDescriptionElement]] = None
+    layersDescription: Optional[List[Layer]] = None
     """The data from the winding at the section level, in a way that can be used by more
     advanced analytical and finite element models
     """
-    sectionsDescription: Optional[List[SectionsDescriptionElement]] = None
+    sectionsDescription: Optional[List[Section]] = None
     """The data from the winding at the turn level, in a way that can be used by the most
     advanced analytical and finite element models
     """
-    turnsDescription: Optional[List[TurnsDescriptionElement]] = None
+    turnsDescription: Optional[List[Turn]] = None
 
 
 class Magnetic(BaseModel):
@@ -1346,6 +1371,146 @@ class Magnetic(BaseModel):
     winding: Winding
 
 
+class Origin(Enum):
+    """Origin of the value of the result"""
+    manufacturer = "manufacturer"
+    measurement = "measurement"
+    simulation = "simulation"
+
+
+class CoreLossesOutput(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data describing the output core losses
+    
+    Data describing the core losses and the intermediate inputs used to calculate them
+    """
+    """Value of the core losses"""
+    coreLosses: float
+    """Model used to calculate the core losses in the case of simulation, or method used to
+    measure it
+    """
+    methodUsed: str
+    """Origin of the value of the result"""
+    origin: Origin
+    """Part of the core losses due to eddy currents"""
+    eddyCurrentCoreLosses: Optional[float] = None
+    """Part of the core losses due to hysteresis"""
+    hysteresisCoreLosses: Optional[float] = None
+    """Excitation of the B field that produced the core losses"""
+    magneticFluxDensity: Optional[OperationPointExcitation] = None
+    """temperature in the core that produced the core losses"""
+    temperature: Optional[float] = None
+    """Volumetric value of the core losses"""
+    volumetricLosses: Optional[float] = None
+
+
+class LeakageInductanceOutput(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data describing the output magnetic strength field
+    
+    Data describing the leakage inductance and the intermediate inputs used to calculate them
+    """
+    """Value of the leakage inductance"""
+    leakageInductance: float
+    """Model used to calculate the leakage inductance in the case of simulation, or method used
+    to measure it
+    """
+    methodUsed: str
+    """Origin of the value of the result"""
+    origin: Origin
+
+
+class MagnetizingInductanceOutput(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data describing the output magnetic strength field
+    
+    Data describing the magnetizing inductance and the intermediate inputs used to calculate
+    them
+    """
+    """Value of the magnetizing inductance"""
+    magnetizingInductance: float
+    """Model used to calculate the magnetizing inductance in the case of simulation, or method
+    used to measure it
+    """
+    methodUsed: str
+    """Origin of the value of the result"""
+    origin: Origin
+
+
+class WindingLossesOutput(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data describing the output winding losses
+    
+    Data describing the winding losses and the intermediate inputs used to calculate them
+    """
+    """Model used to calculate the winding losses in the case of simulation, or method used to
+    measure it
+    """
+    methodUsed: str
+    """Origin of the value of the result"""
+    origin: Origin
+    """Value of the winding losses"""
+    windingLosses: float
+    """Excitation of the current per winding that produced the winding losses"""
+    currentPerWinding: Optional[OperationPointExcitation] = None
+    """temperature in the winding that produced the winding losses"""
+    temperature: Optional[float] = None
+
+
+class FieldPoint(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data describing the magnetizing inductance and the intermediate inputs used to calculate
+    them
+    """
+    """The coordinates of the point of the field"""
+    point: List[float]
+    """Value of the field at this point"""
+    value: float
+
+
+class WindingWindowMagneticStrengthFieldOutput(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """Data describing the output magnetic strength field
+    
+    Data describing the magnetic strengtg field inside the winding window
+    """
+    """Value of the magnetizing inductance"""
+    data: List[FieldPoint]
+    """Value of the field at this point"""
+    frequency: float
+    """Model used to calculate the magnetizing inductance in the case of simulation, or method
+    used to measure it
+    """
+    methodUsed: str
+    """Origin of the value of the result"""
+    origin: Origin
+
+
+class Outputs(BaseModel):
+    class Config:  
+        use_enum_values = True
+    """The description of the outputs that are produced after designing a Magnetic
+    
+    The description of the outputs that result of simulating a Magnetic
+    """
+    """Data describing the output core losses"""
+    coreLosses: Optional[CoreLossesOutput] = None
+    """Data describing the output magnetic strength field"""
+    leakageInductance: Optional[LeakageInductanceOutput] = None
+    """Data describing the output magnetic strength field"""
+    magnetizingInductance: Optional[MagnetizingInductanceOutput] = None
+    """Data describing the output winding losses"""
+    windingLosses: Optional[WindingLossesOutput] = None
+    """Data describing the output magnetic strength field"""
+    windingWindowMagneticStrengthField: Optional[WindingWindowMagneticStrengthFieldOutput] = None
+
+
 class Mas(BaseModel):
     class Config:  
         use_enum_values = True
@@ -1354,3 +1519,5 @@ class Mas(BaseModel):
     inputs: Inputs
     """The description of a magnetic"""
     magnetic: Magnetic
+    """The description of the outputs that are produced after designing a Magnetic"""
+    outputs: Optional[Outputs]
