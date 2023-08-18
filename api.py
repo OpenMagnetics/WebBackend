@@ -11,7 +11,6 @@ import json
 import bson
 import sys
 from bson import ObjectId, json_util
-import PyMKF
 import numpy
 import copy
 import pprint
@@ -338,53 +337,6 @@ def core_get_families():
     return {"families": families}
 
 
-@app.post("/core_get_commercial_data")
-def core_get_commercial_data():
-    commercial_shapes = PyMKF.get_available_core_shapes()
-
-    core_data = pandas.DataFrame()
-    dummyCore = {
-        "functionalDescription": {
-            "name": "dummy",
-            "type": "two-piece set",
-            "material": "dummy",
-            "shape": None,
-            "gapping": [],
-            "numberStacks": 1
-        }
-    }
-    for shape in commercial_shapes:
-        family = shape.split(" ")[0].lower()
-        if family not in ['ui', 'pqi']:
-            core = copy.deepcopy(dummyCore)
-            if family in ['t', 'r']:
-                core['functionalDescription']['type'] = "toroidal"
-            if family in ['ut']:
-                core['functionalDescription']['type'] = "closed shape"
-            core['functionalDescription']['shape'] = shape
-            try:
-                core_datum = PyMKF.get_core_data(core, False)
-            except RuntimeError as e:
-                print(core)
-                raise HTTPException(
-                    status_code=418, detail="Error reading list of core shapes"
-                ) from e
-            core_data = pandas.concat([core_data, pandas.DataFrame.from_records([core_datum])])
-
-    return {"commercial_cores": core_data.to_dict('records')}
-
-
-@app.post("/core_get_commercial_materials")
-def core_get_commercial_materials():
-    commercial_material_names = PyMKF.get_available_core_materials()
-
-    commercial_materials = [
-        PyMKF.get_material_data(commercial_material_name)
-        for commercial_material_name in commercial_material_names
-    ]
-    return {"commercial_materials": commercial_materials}
-
-
 @app.post("/core_compute_shape_obj")
 @app.post("/core_compute_shape")
 def core_compute_shape(coreShape: CoreShape):
@@ -412,22 +364,24 @@ def core_compute_shape_stp(coreShape: CoreShape):
 
 @app.post("/core_compute_core_3d_model_obj")
 @app.post("/core_compute_core_3d_model")
-def core_compute_core_3d_model(core: MagneticCore):
+async def core_compute_core_3d_model(request: Request):
+    json = await request.json()
+    if 'familySubtype' in json['functionalDescription']['shape']:
+        json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
 
+    core = MagneticCore(**json)
     core = core.dict()
 
     core = clean_dimensions(core)
     if not isinstance(core['functionalDescription']['material'], str):
         core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
-    core['geometricalDescription'] = None
-    core['processedDescription'] = None
-    # pprint.pprint(core)
-    core_datum = PyMKF.get_core_data(core, False)
-    step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
-                                                  geometrical_description=core_datum['geometricalDescription'],
+
+    pprint.pprint(core)
+    step_path, obj_path = ShapeBuilder().get_core(project_name=core['functionalDescription']['shape']['name'],
+                                                  geometrical_description=core['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
-    # print(step_path)
-    # print(obj_path)
+    print(step_path)
+    print(obj_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -435,16 +389,17 @@ def core_compute_core_3d_model(core: MagneticCore):
 
 
 @app.post("/core_compute_core_3d_model_stp")
-def core_compute_core_3d_model_stp(core: MagneticCore):
+async def core_compute_core_3d_model_stp(request: Request):
+    json = await request.json()
+    if 'familySubtype' in json['functionalDescription']['shape']:
+        json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
 
+    core = MagneticCore(**json)
     core = core.dict()
 
     core = clean_dimensions(core)
-    core['geometricalDescription'] = None
-    core['processedDescription'] = None
-    core_datum = PyMKF.get_core_data(core, False)
-    step_path, obj_path = ShapeBuilder().get_core(project_name=core_datum['functionalDescription']['shape']['name'],
-                                                  geometrical_description=core_datum['geometricalDescription'],
+    step_path, obj_path = ShapeBuilder().get_core(project_name=core['functionalDescription']['shape']['name'],
+                                                  geometrical_description=core['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
     # print(step_path)
     # print(obj_path)
@@ -455,7 +410,13 @@ def core_compute_core_3d_model_stp(core: MagneticCore):
 
 
 @app.post("/core_compute_technical_drawing")
-def core_compute_technical_drawing(coreShape: CoreShape):
+async def core_compute_technical_drawing(request: Request):
+    json = await request.json()
+    if 'familySubtype' in json:
+        json['familySubtype'] = str(json['familySubtype'])
+
+    coreShape = CoreShape(**json)
+
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
     core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")
@@ -471,18 +432,21 @@ def core_compute_technical_drawing(coreShape: CoreShape):
 
 
 @app.post("/core_compute_gapping_technical_drawing")
-def core_compute_gapping_technical_drawing(core: MagneticCore):
-    core = core.dict()
+async def core_compute_gapping_technical_drawing(request: Request):
+    json = await request.json()
+    if 'familySubtype' in json['functionalDescription']['shape']:
+        json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
 
-    core_datum = PyMKF.get_core_data(core, False)
+    core = MagneticCore(**json)
+    core = core.dict()
 
     colors = {
         "projection_color": "#d4d4d4",
         "dimension_color": "#d4d4d4"
     }
 
-    views = ShapeBuilder().get_core_gapping_technical_drawing(project_name=core_datum['functionalDescription']['shape']['name'],
-                                                              core_data=core_datum,
+    views = ShapeBuilder().get_core_gapping_technical_drawing(project_name=core['functionalDescription']['shape']['name'],
+                                                              core_data=core,
                                                               colors=colors,
                                                               save_files=False)
     if views['front_view'] is None:
@@ -490,159 +454,20 @@ def core_compute_gapping_technical_drawing(core: MagneticCore):
     else:
         return views
 
-
-@app.post("/core_compute_core_parameters")
-def core_compute_core_parameters(core: MagneticCore):
-    core = core.dict()
-    if not isinstance(core['functionalDescription']['shape'], str):
-        core = clean_dimensions(core)
-    return PyMKF.get_core_data(core, False)
-
-
-@app.post("/get_material_data")
-def get_material_data(material: MaterialNameOnly):
-    material = material.dict()
-    return PyMKF.get_material_data(material['name'])
-
-
-@app.post("/core_compute_gap_reluctances")
-async def core_compute_gap_reluctances(request: Request):
-    json = await request.json()
-    model = json["model"]
-    gapping = json["gapping"]
-    return [
-        PyMKF.get_gap_reluctance(
-            gapping[index], model.upper().replace(" ", "_")
-        )
-        for index in range(len(gapping))
-    ]
-
-
-@app.post("/get_constants")
-def get_constants():
-    return PyMKF.get_constants()
-
-
-@app.post("/get_gap_reluctance_models")
-def get_gap_reluctance_models():
-    return PyMKF.get_gap_reluctance_model_information()
-
-
-@app.post("/get_inductance_from_number_turns_and_gapping")
-async def get_inductance_from_number_turns_and_gapping(request: Request):
-    json = await request.json()
-    models = json["models"]
-    simulation = Mas(**json["simulation"])
-
-    simulation = simulation.dict()
-    if simulation['magnetic']['winding']['bobbin'] is None:
-        simulation['magnetic']['winding']['bobbin'] = "Dummy"
-
-    try:
-        inductance = PyMKF.get_inductance_from_number_turns_and_gapping(simulation['magnetic']['core'],
-                                                                        simulation['magnetic']['winding'],
-                                                                        simulation['inputs']['operationPoints'][0],
-                                                                        models)
-        return inductance
-    except RuntimeError:
-        print("Inductance error")
-        print(models)
-        print(simulation['magnetic']['core'])
-        print(simulation['magnetic']['winding'])
-        print(simulation['inputs']['operationPoints'][0])
-        raise HTTPException(418, "Inductance is a teapot.")
-
-
-
-@app.post("/get_number_turns_from_gapping_and_inductance")
-async def get_number_turns_from_gapping_and_inductance(request: Request):
-    json = await request.json()
-    models = json["models"]
-    simulation = Mas(**json["simulation"])
-
-    simulation = simulation.dict()
-    if simulation['magnetic']['winding']['bobbin'] is None:
-        simulation['magnetic']['winding']['bobbin'] = "Dummy"
-    try:
-        inductance = PyMKF.get_number_turns_from_gapping_and_inductance(simulation['magnetic']['core'],
-                                                                        simulation['inputs'],
-                                                                        models)
-        return inductance
-    except RuntimeError:
-        pprint.pprint(models)
-        pprint.pprint(simulation['magnetic']['core'])
-        pprint.pprint(simulation['inputs'])
-
-
-@app.post("/get_gapping_from_number_turns_and_inductance")
-async def get_gapping_from_number_turns_and_inductance(request: Request):
-    json = await request.json()
-    models = json["models"]
-    gappingType = json["gappingType"]
-    simulation = Mas(**json["simulation"])
-
-    simulation = simulation.dict()
-    if simulation['magnetic']['winding']['bobbin'] is None:
-        simulation['magnetic']['winding']['bobbin'] = "Dummy"
-    try:
-        gapping = PyMKF.get_gapping_from_number_turns_and_inductance(simulation['magnetic']['core'],
-                                                                     simulation['magnetic']['winding'],
-                                                                     simulation['inputs'],
-                                                                     gappingType,
-                                                                     4,
-                                                                     models)
-        core = simulation['magnetic']['core']
-        core['functionalDescription']['gapping'] = gapping
-        return PyMKF.get_core_data(core, False)
-    except RuntimeError:
-        pprint.pprint(models)
-        pprint.pprint(simulation['magnetic']['core'])
-        pprint.pprint(simulation['magnetic']['winding'])
-        pprint.pprint(simulation['inputs'])
-        pprint.pprint(gappingType)
-    
-
-
-@app.post("/get_core_losses")
-async def get_core_losses(request: Request):
-    json = await request.json()
-    models = json["models"]
-    simulation = Mas(**json["simulation"])
-    simulation = simulation.dict()
-
-    if simulation['magnetic']['winding']['bobbin'] is None:
-        simulation['magnetic']['winding']['bobbin'] = "Dummy"
-
-    try:
-        return PyMKF.get_core_losses(
-            simulation['magnetic']['core'],
-            simulation['magnetic']['winding'],
-            simulation['inputs'],
-            models,
-        )
-    except (RuntimeError, TypeError):
-        del simulation['magnetic']['core']['processedDescription']
-        del simulation['magnetic']['core']['geometricalDescription']
-
-        print(models)
-        print(simulation['magnetic']['core'])
-        print(simulation['magnetic']['winding'])
-        print(simulation['inputs'])
-        raise HTTPException(418, "Core losses is a teapot.")
-
-    
-
-@app.post("/get_core_losses_models")
-async def get_core_losses_models(request: Request):
-    json = await request.json()
-    print(json)
-    models_info = PyMKF.get_core_losses_model_information(json['materialName'])
-    print(models_info)
-    return models_info
-    
-
-@app.post("/get_core_temperature_models")
-def get_core_temperature_models():
-    models_info = PyMKF.get_core_temperature_model_information()
-    print(models_info)
-    return models_info
+@app.post("/read_mas_database")
+def read_mas_database():
+    core_materials = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/core_materials.ndjson', lines=True).fillna('')
+    core_shapes = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/core_shapes.ndjson', lines=True).fillna('')
+    wires = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/wires.ndjson', lines=True).fillna('')
+    bobbins = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/bobbins.ndjson', lines=True).fillna('')
+    insulation_materials = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/insulation_materials.ndjson', lines=True).fillna('')
+    wire_materials = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/wire_materials.ndjson', lines=True).fillna('')
+    data = {
+        'coreMaterials': core_materials.to_dict('records'),
+        'coreShapes': core_shapes.to_dict('records'),
+        'wires': wires.to_dict('records'),
+        'bobbins': bobbins.to_dict('records'),
+        'insulationMaterials': insulation_materials.to_dict('records'),
+        'wireMaterials': wire_materials.to_dict('records'),
+    }
+    return data
