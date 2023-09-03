@@ -462,7 +462,8 @@ def read_mas_database():
     bobbins = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/bobbins.ndjson', lines=True).fillna('')
     insulation_materials = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/insulation_materials.ndjson', lines=True).fillna('')
     wire_materials = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/wire_materials.ndjson', lines=True).fillna('')
-    data = {
+    core_shapes = core_shapes[(core_shapes['family'] != 'ui') & (core_shapes['family'] != 'pqi')]
+    return {
         'coreMaterials': core_materials.to_dict('records'),
         'coreShapes': core_shapes.to_dict('records'),
         'wires': wires.to_dict('records'),
@@ -470,4 +471,3 @@ def read_mas_database():
         'insulationMaterials': insulation_materials.to_dict('records'),
         'wireMaterials': wire_materials.to_dict('records'),
     }
-    return data
