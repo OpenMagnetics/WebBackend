@@ -471,3 +471,12 @@ def read_mas_database():
         'insulationMaterials': insulation_materials.to_dict('records'),
         'wireMaterials': wire_materials.to_dict('records'),
     }
+
+@app.post("/read_mas_inventory")
+def read_mas_inventory():
+    cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/coresInventory.ndjson', lines=True).fillna('')
+    # cores = cores.head(400)
+    print(len(cores.index))
+    return {
+        'cores': cores.to_dict('records'),
+    }
