@@ -474,9 +474,11 @@ def read_mas_database():
 
 @app.post("/read_mas_inventory")
 def read_mas_inventory():
-    cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/coresInventory.ndjson', lines=True).fillna('')
-    # cores = cores.head(400)
+    cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/cores_inventory.ndjson', lines=True).fillna('')
+
+    cores = cores[cores.apply(lambda row: len(row['distributorsInfo']) > 1, axis=1)]
     print(len(cores.index))
+
     return {
         'cores': cores.to_dict('records'),
     }
