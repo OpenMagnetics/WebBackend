@@ -4,7 +4,7 @@ from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinS
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport, MaterialNameOnly
 from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 import pandas
 from datetime import datetime
 import json
@@ -15,6 +15,8 @@ import numpy
 import copy
 import pprint
 import os
+import pathlib
+import base64
 from typing import List, Union
 
 sys.path.append("../MVB/src")
@@ -482,3 +484,37 @@ def read_mas_inventory():
     return {
         'cores': cores.to_dict('records'),
     }
+
+from pylatex import Document, Section, Subsection, Command, Package
+from pylatex.utils import italic, NoEscape
+
+@app.post("/process_latex")
+async def process_latex(request: Request):
+    print(request)
+    print(dir(request))
+    tex = await request.body()
+    tex = tex.decode('utf-8')
+    filepath = "/opt/openmagnetics/latex"
+    pathlib.Path(filepath).mkdir(parents=True, exist_ok=True)
+    doc = Document(default_filepath=f"{filepath}/tex")
+    doc.packages.append(Package('array'))
+    doc.packages.append(Package('booktabs'))
+    doc.packages.append(Package('babel'))
+    doc.packages.append(Package('amsmath'))
+    doc.packages.append(Package('relsize'))
+    doc.packages.append(Package('cellspace'))
+    doc.packages.append(Package('tikz'))
+    doc.packages.append(Package('geometry'))
+    doc.packages.append(Package('fancyhdr'))
+    doc.preamble.append(Command('setlength\cellspacetoplimit', '4pt'))
+    doc.preamble.append(Command('setlength\cellspacebottomlimit', '4pt'))
+    doc.preamble.append(Command('usetikzlibrary', 'datavisualization'))
+    doc.preamble.append(Command('geometry', 'tmargin=1in'))
+    doc.preamble.append(Command('pagestyle', 'fancy'))
+    tex = tex.replace('μ', '$\mu$')
+    doc.append(NoEscape(tex))
+    doc.generate_pdf(clean_tex=False)
+
+    with open(f"{filepath}/tex.pdf", "rb") as pdf_file:
+        pdf_string = base64.b64encode(pdf_file.read())
+        return pdf_string
