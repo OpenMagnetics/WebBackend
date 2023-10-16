@@ -18,6 +18,9 @@ import os
 import pathlib
 import base64
 from typing import List, Union
+from pylatex import Document, Section, Subsection, Command, Package
+from pylatex.utils import italic, NoEscape
+
 
 sys.path.append("../MVB/src")
 from builder import Builder as ShapeBuilder  # noqa: E402
@@ -476,7 +479,7 @@ def read_mas_database():
 
 @app.post("/read_mas_inventory")
 def read_mas_inventory():
-    cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/cores_inventory.ndjson', lines=True).fillna('')
+    cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/cores_stock.ndjson', lines=True).fillna('')
 
     cores = cores[cores.apply(lambda row: len(row['distributorsInfo']) > 1, axis=1)]
     print(len(cores.index))
@@ -484,9 +487,6 @@ def read_mas_inventory():
     return {
         'cores': cores.to_dict('records'),
     }
-
-from pylatex import Document, Section, Subsection, Command, Package
-from pylatex.utils import italic, NoEscape
 
 @app.post("/process_latex")
 async def process_latex(request: Request):
