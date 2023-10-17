@@ -117,31 +117,31 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def read_root():
     return {"Hello": "World"}
 
 
-@app.post("/are_vote_casted")
+@app.post("/are_vote_casted", include_in_schema=False)
 def are_vote_casted(data: Vote):
     vote = RoadmapVotesTable().are_vote_casted(**data.dict())
     return {"voted_milestones": vote.to_dict('records')}
 
 
-@app.post("/get_number_votes")
+@app.post("/get_number_votes", include_in_schema=False)
 def get_number_votes():
     number_votes = RoadmapVotesTable().get_all_number_votes()
     return {"number_votes": number_votes.to_dict('records')}
 
 
-@app.post("/get_all_number_votes")
+@app.post("/get_all_number_votes", include_in_schema=False)
 def get_all_number_votes():
     number_votes = RoadmapVotesTable().get_all_number_votes()
     number_votes = number_votes.to_dict('records')
     return number_votes
 
 
-@app.post("/cast_vote")
+@app.post("/cast_vote", include_in_schema=False)
 def cast_vote(data: Vote):
     roadmap_votes_table = RoadmapVotesTable()
     if roadmap_votes_table.is_vote_casted(**data.dict()):
@@ -150,14 +150,14 @@ def cast_vote(data: Vote):
     return {"voted": vote}
 
 
-@app.post("/get_notifications")
+@app.post("/get_notifications", include_in_schema=False)
 def get_notifications():
     notifications_table = NotificationsTable()
     new_notifications = notifications_table.read_active_notifications(datetime.now())
     return{"notifications": new_notifications.to_dict('records')}
 
 
-@app.post("/report_bug")
+@app.post("/report_bug", include_in_schema=False)
 def report_bug(data: BugReport):
     data = data.dict()
 
@@ -166,7 +166,7 @@ def report_bug(data: BugReport):
     return{"status": "reported", "bug_report_id": bug_report_id}
 
 
-@app.post("/login")
+@app.post("/login", include_in_schema=False)
 def login(data: UserLogin):
     data = data.dict()
     user_table = UsersTable()
@@ -178,7 +178,7 @@ def login(data: UserLogin):
         return{"status": "wrong password"}
 
 
-@app.post("/register")
+@app.post("/register", include_in_schema=False)
 def register(data: UserRegister):
     data = data.dict()
     user_table = UsersTable()
@@ -191,16 +191,16 @@ def register(data: UserRegister):
         return{"status": "registered", "user_id": user_id, "username": data['username']}
 
 
-@app.post("/operation_point_save")
-@app.post("/operation_point_save/{id}")
-@app.post("/core_save")
-@app.post("/core_save/{id}")
-@app.post("/bobbin_save")
-@app.post("/bobbin_save/{id}")
-@app.post("/wire_save")
-@app.post("/wire_save/{id}")
-@app.post("/magnetic_save")
-@app.post("/magnetic_save/{id}")
+@app.post("/operation_point_save", include_in_schema=False)
+@app.post("/operation_point_save/{id}", include_in_schema=False)
+@app.post("/core_save", include_in_schema=False)
+@app.post("/core_save/{id}", include_in_schema=False)
+@app.post("/bobbin_save", include_in_schema=False)
+@app.post("/bobbin_save/{id}", include_in_schema=False)
+@app.post("/wire_save", include_in_schema=False)
+@app.post("/wire_save/{id}", include_in_schema=False)
+@app.post("/magnetic_save", include_in_schema=False)
+@app.post("/magnetic_save/{id}", include_in_schema=False)
 async def save(request: Request, id: str = None):
     table = get_table(request.url._url)
     data = await request.json()
@@ -221,11 +221,11 @@ async def save(request: Request, id: str = None):
         return {"status": "error saving"}
 
 
-@app.post("/operation_point_publish")
-@app.post("/core_publish")
-@app.post("/bobbin_publish")
-@app.post("/wire_publish")
-@app.post("/magnetic_publish")
+@app.post("/operation_point_publish", include_in_schema=False)
+@app.post("/core_publish", include_in_schema=False)
+@app.post("/bobbin_publish", include_in_schema=False)
+@app.post("/wire_publish", include_in_schema=False)
+@app.post("/magnetic_publish", include_in_schema=False)
 def operation_point_publish(data: OperationPointSlug, request: Request):
     data = data.dict()
     slugs_table = get_table_slug(request.url._url)
@@ -237,16 +237,16 @@ def operation_point_publish(data: OperationPointSlug, request: Request):
     return {"status": "published", "slug": slug}
 
 
-@app.post("/operation_point_load")
-@app.post("/operation_point_load/{element_id_or_slug}")
-@app.post("/core_load")
-@app.post("/core_load/{element_id_or_slug}")
-@app.post("/bobbin_load")
-@app.post("/bobbin_load/{element_id_or_slug}")
-@app.post("/wire_load")
-@app.post("/wire_load/{element_id_or_slug}")
-@app.post("/magnetic_load")
-@app.post("/magnetic_load/{element_id_or_slug}")
+@app.post("/operation_point_load", include_in_schema=False)
+@app.post("/operation_point_load/{element_id_or_slug}", include_in_schema=False)
+@app.post("/core_load", include_in_schema=False)
+@app.post("/core_load/{element_id_or_slug}", include_in_schema=False)
+@app.post("/bobbin_load", include_in_schema=False)
+@app.post("/bobbin_load/{element_id_or_slug}", include_in_schema=False)
+@app.post("/wire_load", include_in_schema=False)
+@app.post("/wire_load/{element_id_or_slug}", include_in_schema=False)
+@app.post("/magnetic_load", include_in_schema=False)
+@app.post("/magnetic_load/{element_id_or_slug}", include_in_schema=False)
 def operation_point_load(username: Username, request: Request, element_id_or_slug: str = None):
     table = get_table(request.url._url)
     username = username.dict()["username"]
@@ -289,11 +289,11 @@ def operation_point_load(username: Username, request: Request, element_id_or_slu
         return {"element": result.to_dict('records')[0]}
 
 
-@app.post("/operation_point_count")
-@app.post("/core_count")
-@app.post("/bobbin_count")
-@app.post("/wire_count")
-@app.post("/magnetic_count")
+@app.post("/operation_point_count", include_in_schema=False)
+@app.post("/core_count", include_in_schema=False)
+@app.post("/bobbin_count", include_in_schema=False)
+@app.post("/wire_count", include_in_schema=False)
+@app.post("/magnetic_count", include_in_schema=False)
 def count(username: Username, request: Request):
     table = get_table(request.url._url)
     username = username.dict()["username"]
@@ -308,11 +308,11 @@ def count(username: Username, request: Request):
     return {"count": count}
 
 
-@app.post("/operation_point_delete/{element_id}")
-@app.post("/core_delete/{element_id}")
-@app.post("/bobbin_delete/{element_id}")
-@app.post("/wire_delete/{element_id}")
-@app.post("/magnetic_delete/{element_id}")
+@app.post("/operation_point_delete/{element_id}", include_in_schema=False)
+@app.post("/core_delete/{element_id}", include_in_schema=False)
+@app.post("/bobbin_delete/{element_id}", include_in_schema=False)
+@app.post("/wire_delete/{element_id}", include_in_schema=False)
+@app.post("/magnetic_delete/{element_id}", include_in_schema=False)
 def operation_point_delete(username: Username, request: Request, element_id: str = None):
     table = get_table(request.url._url)
     username = username.dict()["username"]
@@ -336,14 +336,14 @@ def operation_point_delete(username: Username, request: Request, element_id: str
     return {"id": result["id"]} if result["result"] else {"id": None}
 
 
-@app.post("/core_get_families")
+@app.post("/core_get_families", include_in_schema=False)
 def core_get_families():
     families = ShapeBuilder().get_families()
     return {"families": families}
 
 
-@app.post("/core_compute_shape_obj")
-@app.post("/core_compute_shape")
+@app.post("/core_compute_shape_obj", include_in_schema=False)
+@app.post("/core_compute_shape", include_in_schema=False)
 def core_compute_shape(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
@@ -355,7 +355,7 @@ def core_compute_shape(coreShape: CoreShape):
         return FileResponse(obj_path)
 
 
-@app.post("/core_compute_shape_stp")
+@app.post("/core_compute_shape_stp", include_in_schema=False)
 def core_compute_shape_stp(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
@@ -367,8 +367,8 @@ def core_compute_shape_stp(coreShape: CoreShape):
         return FileResponse(step_path)
 
 
-@app.post("/core_compute_core_3d_model_obj")
-@app.post("/core_compute_core_3d_model")
+@app.post("/core_compute_core_3d_model_obj", include_in_schema=False)
+@app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
     json = await request.json()
     if 'familySubtype' in json['functionalDescription']['shape']:
@@ -393,7 +393,7 @@ async def core_compute_core_3d_model(request: Request):
         return FileResponse(obj_path)
 
 
-@app.post("/core_compute_core_3d_model_stp")
+@app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
 async def core_compute_core_3d_model_stp(request: Request):
     json = await request.json()
     if 'familySubtype' in json['functionalDescription']['shape']:
@@ -414,7 +414,7 @@ async def core_compute_core_3d_model_stp(request: Request):
         return FileResponse(step_path)
 
 
-@app.post("/core_compute_technical_drawing")
+@app.post("/core_compute_technical_drawing", include_in_schema=False)
 async def core_compute_technical_drawing(request: Request):
     json = await request.json()
     if 'familySubtype' in json:
@@ -436,7 +436,7 @@ async def core_compute_technical_drawing(request: Request):
         return views
 
 
-@app.post("/core_compute_gapping_technical_drawing")
+@app.post("/core_compute_gapping_technical_drawing", include_in_schema=False)
 async def core_compute_gapping_technical_drawing(request: Request):
     json = await request.json()
     if 'familySubtype' in json['functionalDescription']['shape']:
@@ -459,7 +459,7 @@ async def core_compute_gapping_technical_drawing(request: Request):
     else:
         return views
 
-@app.post("/read_mas_database")
+@app.post("/read_mas_database", include_in_schema=False)
 def read_mas_database():
     core_materials = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/core_materials.ndjson', lines=True).fillna('')
     core_shapes = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/core_shapes.ndjson', lines=True).fillna('')
@@ -477,7 +477,7 @@ def read_mas_database():
         'wireMaterials': wire_materials.to_dict('records'),
     }
 
-@app.post("/read_mas_inventory")
+@app.post("/read_mas_inventory", include_in_schema=False)
 def read_mas_inventory():
     cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/cores_stock.ndjson', lines=True).fillna('')
 
@@ -488,7 +488,7 @@ def read_mas_inventory():
         'cores': cores.to_dict('records'),
     }
 
-@app.post("/process_latex")
+@app.post("/process_latex", include_in_schema=True)
 async def process_latex(request: Request):
     print(request)
     print(dir(request))
