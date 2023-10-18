@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport, MaterialNameOnly
-from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas
+from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 import pandas
@@ -518,3 +518,11 @@ async def process_latex(request: Request):
     with open(f"{filepath}/tex.pdf", "rb") as pdf_file:
         pdf_string = base64.b64encode(pdf_file.read())
         return pdf_string
+
+@app.post("/calculate_core_losses", include_in_schema=True)
+def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
+    import PyMKF
+    magnetic = magnetic.dict()
+    models = {
+    }
+    return PyMKF.get_core_losses(magnetic, inputs, models)
