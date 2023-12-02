@@ -526,3 +526,15 @@ def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
     models = {
     }
     return PyMKF.get_core_losses(magnetic, inputs, models)
+
+@app.post("/read_insulation_standards", include_in_schema=False)
+def read_insulation_standards():
+    data = {}
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-1.json', 'r') as f:
+        data["IEC_60664-1"] = json.load(f)
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-4.json', 'r') as f:
+        data["IEC_60664-4"] = json.load(f)
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-5.json', 'r') as f:
+        data["IEC_60664-5"] = json.load(f)
+
+    return data
