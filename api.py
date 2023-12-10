@@ -536,5 +536,11 @@ def read_insulation_standards():
         data["IEC_60664-4"] = json.load(f)
     with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-5.json', 'r') as f:
         data["IEC_60664-5"] = json.load(f)
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_62368-1.json', 'r') as f:
+        data["IEC_62368-1"] = json.load(f)
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_61558-1.json', 'r') as f:
+        data["IEC_61558-1"] = json.load(f)
+    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_61558-2-16.json', 'r') as f:
+        data["IEC_61558-2-16"] = json.load(f)
 
     return data
