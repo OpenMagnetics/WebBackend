@@ -477,16 +477,17 @@ def read_mas_database():
         'wireMaterials': wire_materials.to_dict('records'),
     }
 
-@app.post("/read_mas_inventory", include_in_schema=False)
-def read_mas_inventory():
-    cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/cores_stock.ndjson', lines=True).fillna('')
+# @app.post("/read_mas_inventory", include_in_schema=False)
+# def read_mas_inventory():
+#     cores = pandas.read_json(f'{os.path.dirname(os.path.abspath(__file__))}/../MAS/data/cores.ndjson', lines=True).fillna('')
 
-    cores = cores[cores.apply(lambda row: len(row['distributorsInfo']) > 1, axis=1)]
-    print(len(cores.index))
+#     cores = cores[cores.apply(lambda row: len(row['distributorsInfo']) > 1, axis=1)]
+#     print(len(cores.index))
 
-    return {
-        'cores': cores.to_dict('records'),
-    }
+#     return {
+#         'cores': cores.to_dict('records'),
+#     }
+
 
 @app.post("/process_latex", include_in_schema=True)
 async def process_latex(request: Request):
@@ -526,23 +527,3 @@ def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
     models = {
     }
     return PyMKF.get_core_losses(magnetic, inputs, models)
-
-@app.post("/read_insulation_standards", include_in_schema=False)
-def read_insulation_standards():
-    data = {}
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-1.json', 'r') as f:
-        data["IEC_60664-1"] = json.load(f)
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-4.json', 'r') as f:
-        data["IEC_60664-4"] = json.load(f)
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60664-5.json', 'r') as f:
-        data["IEC_60664-5"] = json.load(f)
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_62368-1.json', 'r') as f:
-        data["IEC_62368-1"] = json.load(f)
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_61558-1.json', 'r') as f:
-        data["IEC_61558-1"] = json.load(f)
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_61558-2-16.json', 'r') as f:
-        data["IEC_61558-2-16"] = json.load(f)
-    with open(f'{os.path.dirname(os.path.abspath(__file__))}/../MKF/src/data/insulation_standards/IEC_60335-1.json', 'r') as f:
-        data["IEC_60335-1"] = json.load(f)
-
-    return data
