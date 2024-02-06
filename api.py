@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
-from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPoint, OperationPointSlug, Username, BugReport, MaterialNameOnly
-from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas, Magnetic, Inputs
+from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPointSlug, Username, BugReport, MaterialNameOnly
+from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas, Magnetic, OperatingPoint, Inputs
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 import pandas
@@ -17,9 +17,11 @@ import pprint
 import os
 import pathlib
 import base64
+import time
 from typing import List, Union
 from pylatex import Document, Section, Subsection, Command, Package
 from pylatex.utils import italic, NoEscape
+import PyMKF
 
 
 sys.path.append("../MVB/src")
@@ -520,6 +522,7 @@ async def process_latex(request: Request):
         pdf_string = base64.b64encode(pdf_file.read())
         return pdf_string
 
+
 @app.post("/calculate_core_losses", include_in_schema=True)
 def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
     import PyMKF
@@ -527,3 +530,20 @@ def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
     models = {
     }
     return PyMKF.get_core_losses(magnetic, inputs, models)
+
+
+@app.post("/plot_core_and_fields", include_in_schema=True)
+async def plot_core_and_fields(request: Request):
+    data = await request.json()
+    os.remove("/opt/openmagnetics/ea.svg")
+
+    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
+    timeout = 0
+    current_size = 0
+    while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
+        current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 10000:
+            HTTPException(status_code=418, detail="Plotting timed out")
+    return FileResponse("/opt/openmagnetics/ea.svg")
