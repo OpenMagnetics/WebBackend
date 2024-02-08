@@ -541,7 +541,7 @@ async def plot_core_and_fields(request: Request):
     except OSError:
         pass
 
-    print(PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg"))
+    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
     timeout = 0
     current_size = 0
     while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
@@ -562,7 +562,7 @@ async def plot_core(request: Request):
     except OSError:
         pass
 
-    print(PyMKF.plot_turns(data["magnetic"], "/opt/openmagnetics/ea.svg"))
+    PyMKF.plot_turns(data["magnetic"], "/opt/openmagnetics/ea.svg")
     timeout = 0
     current_size = 0
     while not os.path.exists("/opt/openmagnetics/ea.svg"):
