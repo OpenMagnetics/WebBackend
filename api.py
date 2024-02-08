@@ -535,11 +535,43 @@ def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
 @app.post("/plot_core_and_fields", include_in_schema=True)
 async def plot_core_and_fields(request: Request):
     data = await request.json()
-    os.remove("/opt/openmagnetics/ea.svg")
 
-    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
+    try:
+        os.remove("/opt/openmagnetics/ea.svg")
+    except OSError:
+        pass
+
+    print(PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg"))
     timeout = 0
     current_size = 0
+    while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
+        current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 10000:
+            HTTPException(status_code=418, detail="Plotting timed out")
+    return FileResponse("/opt/openmagnetics/ea.svg")
+
+
+@app.post("/plot_core", include_in_schema=True)
+async def plot_core(request: Request):
+    data = await request.json()
+
+    try:
+        os.remove("/opt/openmagnetics/ea.svg")
+    except OSError:
+        pass
+
+    print(PyMKF.plot_turns(data["magnetic"], "/opt/openmagnetics/ea.svg"))
+    timeout = 0
+    current_size = 0
+    while not os.path.exists("/opt/openmagnetics/ea.svg"):
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 2000:
+            HTTPException(status_code=418, detail="Plotting timed out")
+
+    timeout = 0
     while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
         current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
         time.sleep(0.01)
