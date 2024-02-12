@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException
-from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable
+from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable, MasTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPointSlug, Username, BugReport, MaterialNameOnly
 from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas, Magnetic, OperatingPoint, Inputs
@@ -583,3 +583,14 @@ async def plot_core(request: Request):
         if timeout == 10000:
             HTTPException(status_code=418, detail="Plotting timed out")
     return FileResponse("/opt/openmagnetics/ea.svg")
+
+
+@app.post("/insert_mas", include_in_schema=False)
+async def insert_mas(request: Request):
+    data = await request.json()
+
+    print("Inserting")
+
+    mas_table = MasTable()
+    mas_id = mas_table.insert_mas(data)
+    return mas_id
