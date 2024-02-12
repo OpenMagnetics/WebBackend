@@ -21,6 +21,7 @@ import time
 from typing import List, Union
 from pylatex import Document, Section, Subsection, Command, Package
 from pylatex.utils import italic, NoEscape
+import ast
 import PyMKF
 
 
@@ -541,6 +542,9 @@ async def plot_core_and_fields(request: Request):
     except OSError:
         pass
 
+    settings = PyMKF.get_settings()
+    settings["painterIncludeFringing"] = data["includeFringing"]
+    PyMKF.set_settings(settings)
     PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
     timeout = 0
     current_size = 0
