@@ -545,15 +545,16 @@ async def plot_core_and_fields(request: Request):
     settings = PyMKF.get_settings()
     settings["painterIncludeFringing"] = data["includeFringing"]
     PyMKF.set_settings(settings)
-    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
+    result = PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
     timeout = 0
     current_size = 0
     while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
         current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
         time.sleep(0.01)
         timeout += 1
-        if timeout == 10000:
-            HTTPException(status_code=418, detail="Plotting timed out")
+        print(timeout)
+        if timeout == 1000:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
     return FileResponse("/opt/openmagnetics/ea.svg")
 
 
@@ -566,22 +567,23 @@ async def plot_core(request: Request):
     except OSError:
         pass
 
+    pprint.pprint(data["magnetic"])
     PyMKF.plot_turns(data["magnetic"], "/opt/openmagnetics/ea.svg")
     timeout = 0
     current_size = 0
     while not os.path.exists("/opt/openmagnetics/ea.svg"):
         time.sleep(0.01)
         timeout += 1
-        if timeout == 2000:
-            HTTPException(status_code=418, detail="Plotting timed out")
+        if timeout == 200:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
 
     timeout = 0
     while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
         current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
         time.sleep(0.01)
         timeout += 1
-        if timeout == 10000:
-            HTTPException(status_code=418, detail="Plotting timed out")
+        if timeout == 1000:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
     return FileResponse("/opt/openmagnetics/ea.svg")
 
 

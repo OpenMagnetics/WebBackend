@@ -464,8 +464,9 @@ class BobbinFamily(Enum):
     u = "u"
 
 
-class Shape(Enum):
+class PinShape(Enum):
     """The shape of the pin"""
+    irregular = "irregular"
     rectangular = "rectangular"
     round = "round"
 
@@ -482,14 +483,14 @@ class Pin(BaseModel):
     """Data describing one pin in a bobbin"""
     dimensions: List[float]
     """Dimensions of the rectangle defining the pin"""
-    name: str
-    """Name given to the pin"""
-    shape: Shape
+    shape: PinShape
     """The shape of the pin"""
     type: PinDescriptionType
     """Type of pin"""
     coordinates: Optional[List[float]] = None
     """The coordinates of the center of the pin, referred to the center of the main column"""
+    name: Optional[str] = None
+    """Name given to the pin"""
     rotation: Optional[List[float]] = None
     """The rotation of the pin, default is vertical"""
 
@@ -499,12 +500,16 @@ class Pinout(BaseModel):
         use_enum_values = True
     """Data describing the pinout of a bobbin"""
     numberPins: int
-    """The distance between pins"""
+    """The number of pins"""
     pinDescription: Pin
-    pitch: float
-    """The distance between pits"""
+    pitch: List[float]
+    """The distance between pins, per row, by pin order"""
     rowDistance: float
     """The distance between a row of pins and the center of the bobbin"""
+    centralPitch: Optional[float] = None
+    """The distance between central pins"""
+    numberPinsPerRow: Optional[List[int]] = None
+    """List of pins per row"""
     numberRows: Optional[int] = None
     """The number of rows of a bobbin, typically 2"""
 
@@ -558,6 +563,8 @@ class ManufacturerInfo(BaseModel):
     """The manufacturer's URL to the datasheet of the product"""
     family: Optional[str] = None
     """The family of a magnetic, as defined by the manufacturer"""
+    orderCode: Optional[str] = None
+    """The manufacturer's order code of this part"""
     reference: Optional[str] = None
     """The manufacturer's reference of this part"""
     status: Optional[Status] = None
@@ -579,9 +586,13 @@ class WindingOrientation(Enum):
     
     Way in which the layers are oriented inside the section
     """
-    horizontal = "horizontal"
-    radial = "radial"
-    vertical = "vertical"
+    contiguous = "contiguous"
+    overlapping = "overlapping"
+
+
+class WindingWindowShape(Enum):
+    rectangular = "rectangular"
+    round = "round"
 
 
 class WindingWindowElement(BaseModel):
@@ -616,6 +627,8 @@ class WindingWindowElement(BaseModel):
     """Vertical height of the winding window"""
     sectionsOrientation: Optional[WindingOrientation] = None
     """Way in which the sections are oriented inside the winding window"""
+    shape: Optional[WindingWindowShape] = None
+    """Shape of the winding window"""
     width: Optional[float] = None
     """Horizontal width of the winding window"""
     angle: Optional[float] = None
@@ -900,6 +913,12 @@ class CoilFunctionalDescription(BaseModel):
     """Array on elements, representing the all the pins this winding is connected to"""
 
 
+class CoordinateSystem(Enum):
+    """System in which dimension and coordinates are in"""
+    cartesian = "cartesian"
+    polar = "polar"
+
+
 class PartialWinding(BaseModel):
     class Config:  
         use_enum_values = True
@@ -959,6 +978,12 @@ class Layer(BaseModel):
     """List of partial windings in this layer"""
     type: ElectricalType
     """Type of the layer"""
+    additionalCoordinates: Optional[List[List[float]]] = None
+    """List of additional coordinates of the center of the layer, referred to the center of the
+    main column, in case the layer is not symmetrical, as in toroids
+    """
+    coordinateSystem: Optional[CoordinateSystem] = None
+    """System in which dimension and coordinates are in"""
     fillingFactor: Optional[float] = None
     """How much space in this layer is used by wires compared to the total"""
     insulationMaterial: Optional[Union[InsulationMaterial, str]] = None
@@ -987,6 +1012,8 @@ class Section(BaseModel):
     """List of partial windings in this section"""
     type: ElectricalType
     """Type of the layer"""
+    coordinateSystem: Optional[CoordinateSystem] = None
+    """System in which dimension and coordinates are in"""
     fillingFactor: Optional[float] = None
     """How much space in this section is used by wires compared to the total"""
     layersAlignment: Optional[CoilAlignment] = None
@@ -1019,14 +1046,22 @@ class Turn(BaseModel):
     """The index of the parallel that this turn belongs to"""
     winding: str
     """The name of the winding that this turn belongs to"""
+    additionalCoordinates: Optional[List[List[float]]] = None
+    """List of additional coordinates of the center of the turn, referred to the center of the
+    main column, in case the turn is not symmetrical, as in toroids
+    """
     angle: Optional[float] = None
     """The angle that the turn does, useful for partial turns, in degrees"""
+    coordinateSystem: Optional[CoordinateSystem] = None
+    """System in which dimension and coordinates are in"""
     dimensions: Optional[List[float]] = None
     """Dimensions of the rectangle defining the turn"""
     layer: Optional[str] = None
     """The name of the layer that this turn belongs to"""
     orientation: Optional[TurnOrientation] = None
     """Way in which the turn is wound"""
+    rotation: Optional[float] = None
+    """Rotation of the rectangle defining the turn, in degrees"""
     section: Optional[str] = None
     """The name of the section that this turn belongs to"""
 
@@ -1985,6 +2020,8 @@ class FieldPoint(BaseModel):
     """Value of the field at this point"""
     label: Optional[str] = None
     """If this point has some special significance, can be identified with this label"""
+    rotation: Optional[float] = None
+    """Rotation of the rectangle defining the turn, in degrees"""
     turnIndex: Optional[int] = None
     """If this field point is inside of a wire, this is the index of the turn"""
     turnLength: Optional[float] = None
