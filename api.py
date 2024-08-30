@@ -25,7 +25,7 @@ import ast
 import PyMKF
 
 
-sys.path.append("../MVB/src")
+sys.path.append("./MVB/src")
 from builder import Builder as ShapeBuilder  # noqa: E402
 
 
