@@ -6,4 +6,4 @@ sudo apt install texlive-latex-base
 sudo apt install texlive-latex-extra
 
 sudo mkdir /opt/openmagnetics
-sudo chmod -R 777 /opt/openmagnetics/
+sudo chmod -R 777 /opt/openmagnetics

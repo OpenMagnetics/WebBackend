@@ -23,6 +23,7 @@ from pylatex import Document, Section, Subsection, Command, Package
 from pylatex.utils import italic, NoEscape
 import ast
 import PyMKF
+import random
 
 
 sys.path.append("./MVB/src")
@@ -384,7 +385,7 @@ async def core_compute_core_3d_model(request: Request):
     if not isinstance(core['functionalDescription']['material'], str):
         core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
 
-    pprint.pprint(core)
+    # pprint.pprint(core)
     step_path, obj_path = ShapeBuilder().get_core(project_name=core['functionalDescription']['shape']['name'],
                                                   geometrical_description=core['geometricalDescription'],
                                                   output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
@@ -536,55 +537,144 @@ def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
 @app.post("/plot_core_and_fields", include_in_schema=True)
 async def plot_core_and_fields(request: Request):
     data = await request.json()
+    random_id = random.random()
 
     try:
-        os.remove("/opt/openmagnetics/ea.svg")
+        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
     except OSError:
         pass
 
     settings = PyMKF.get_settings()
+    settings["painterSimpleLitz"] = True
+    settings["painterAdvancedLitz"] = False
+    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
     settings["painterIncludeFringing"] = data["includeFringing"]
+    settings["painterColorBobbin"] = "0x7F539796"
+    settings["painterColorText"] = "0xd4d4d4"
+    settings["painterColorLines"] = "0x1a1a1a"
+    settings["painterColorMargin"] = "0x7Ffff05b"
     PyMKF.set_settings(settings)
-    result = PyMKF.plot_field(data["magnetic"], data["operatingPoint"], "/opt/openmagnetics/ea.svg")
+    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"/opt/openmagnetics/ea_{random_id}.svg")
     timeout = 0
     current_size = 0
-    while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
-        current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
+    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
+        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
         time.sleep(0.01)
         timeout += 1
         print(timeout)
         if timeout == 1000:
             raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse("/opt/openmagnetics/ea.svg")
+    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
 
 
 @app.post("/plot_core", include_in_schema=True)
 async def plot_core(request: Request):
     data = await request.json()
+    random_id = random.random()
 
     try:
-        os.remove("/opt/openmagnetics/ea.svg")
+        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
     except OSError:
         pass
 
-    pprint.pprint(data["magnetic"])
-    PyMKF.plot_turns(data["magnetic"], "/opt/openmagnetics/ea.svg")
+    settings = PyMKF.get_settings()
+    settings["painterSimpleLitz"] = True
+    settings["painterAdvancedLitz"] = False
+    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
+    PyMKF.set_settings(settings)
+    # print(data["magnetic"])
+    # print(len(data["magnetic"]["coil"]["turnsDescription"]))
+    PyMKF.plot_turns(data["magnetic"], f"/opt/openmagnetics/ea_{random_id}.svg")
+
     timeout = 0
     current_size = 0
-    while not os.path.exists("/opt/openmagnetics/ea.svg"):
+    while not os.path.exists(f"/opt/openmagnetics/ea_{random_id}.svg"):
         time.sleep(0.01)
         timeout += 1
         if timeout == 200:
             raise HTTPException(status_code=418, detail="Plotting timed out")
 
     timeout = 0
-    while os.stat("/opt/openmagnetics/ea.svg").st_size == 0 or current_size != os.stat("/opt/openmagnetics/ea.svg").st_size:
-        current_size = os.stat("/opt/openmagnetics/ea.svg").st_size
+    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
+        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
         time.sleep(0.01)
         timeout += 1
         if timeout == 1000:
             raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse("/opt/openmagnetics/ea.svg")
+    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
+
+
+@app.post("/plot_wire", include_in_schema=True)
+async def plot_wire(request: Request):
+    data = await request.json()
+    random_id = random.random()
+
+    try:
+        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
+    except OSError:
+        pass
+
+    settings = PyMKF.get_settings()
+    settings["painterSimpleLitz"] = False
+    settings["painterAdvancedLitz"] = False
+    settings["painterColorBobbin"] = "0x539796"
+    settings["painterColorMargin"] = "0xfff05b"
+    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
+    PyMKF.set_settings(settings)
+
+    # print(data["wire"])
+    PyMKF.plot_wire(data["wire"], f"/opt/openmagnetics/ea_{random_id}.svg", "/opt/openmagnetics/cci_coords/coordinates/")
+    timeout = 0
+    current_size = 0
+    while not os.path.exists(f"/opt/openmagnetics/ea_{random_id}.svg"):
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 200:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
+
+    timeout = 0
+    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
+        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 1000:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
+    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
+
+
+@app.post("/plot_wire_and_current_density", include_in_schema=True)
+async def plot_wire_and_current_density(request: Request):
+    data = await request.json()
+    random_id = random.random()
+
+    try:
+        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
+    except OSError:
+        pass
+
+    settings = PyMKF.get_settings()
+    settings["painterSimpleLitz"] = False
+    settings["painterAdvancedLitz"] = False
+    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
+    PyMKF.set_settings(settings)
+
+    PyMKF.plot_current_density(data["wire"], data["operatingPoint"], f"/opt/openmagnetics/ea_{random_id}.svg")
+    timeout = 0
+    current_size = 0
+    while not os.path.exists(f"/opt/openmagnetics/ea_{random_id}.svg"):
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 200:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
+
+    timeout = 0
+    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
+        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
+        time.sleep(0.01)
+        timeout += 1
+        if timeout == 1000:
+            raise HTTPException(status_code=418, detail="Plotting timed out")
+    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
 
 
 @app.post("/insert_mas", include_in_schema=False)
