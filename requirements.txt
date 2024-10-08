@@ -11,3 +11,4 @@ uvicorn
 circus
 shiboken2
 pylatex
+OpenMagneticsVirtualBuilder

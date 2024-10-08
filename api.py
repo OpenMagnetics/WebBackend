@@ -1,33 +1,25 @@
 from fastapi import FastAPI, Request, HTTPException
 from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable, MasTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
-from app.backend.models import Vote, Milestone, UserLogin, UserRegister, OperationPointSlug, Username, BugReport, MaterialNameOnly
-from app.backend.mas_models import MagneticCore, CoreShape, CoreGap, CoreFunctionalDescription, Mas, Magnetic, OperatingPoint, Inputs
+from app.backend.models import Vote, UserLogin, UserRegister, OperationPointSlug, Username, BugReport
+from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 import pandas
 from datetime import datetime
 import json
 import bson
-import sys
 from bson import ObjectId, json_util
-import numpy
 import copy
-import pprint
 import os
 import pathlib
 import base64
 import time
-from typing import List, Union
-from pylatex import Document, Section, Subsection, Command, Package
-from pylatex.utils import italic, NoEscape
-import ast
+from pylatex import Document, Command, Package
+from pylatex.utils import NoEscape
 import PyMKF
 import random
-
-
-sys.path.append("./MVB/src")
-from builder import Builder as ShapeBuilder  # noqa: E402
+from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
 
 
 def clean_dimensions(core):
@@ -158,7 +150,7 @@ def cast_vote(data: Vote):
 def get_notifications():
     notifications_table = NotificationsTable()
     new_notifications = notifications_table.read_active_notifications(datetime.now())
-    return{"notifications": new_notifications.to_dict('records')}
+    return {"notifications": new_notifications.to_dict('records')}
 
 
 @app.post("/report_bug", include_in_schema=False)
@@ -167,7 +159,7 @@ def report_bug(data: BugReport):
 
     bug_reports_table = BugReportsTable()
     bug_report_id = bug_reports_table.report_bug(data['username'], data['userDataDump'], data['userInformation'])
-    return{"status": "reported", "bug_report_id": bug_report_id}
+    return {"status": "reported", "bug_report_id": bug_report_id}
 
 
 @app.post("/login", include_in_schema=False)
@@ -175,11 +167,11 @@ def login(data: UserLogin):
     data = data.dict()
     user_table = UsersTable()
     if not user_table.username_exists(data['username']):
-        return{"status": "unknown username", "username": data['username']}
+        return {"status": "unknown username", "username": data['username']}
     if user_table.check_password(data['username'], data['password']):
-        return{"status": "logged in", "username": data['username']}
+        return {"status": "logged in", "username": data['username']}
     else:
-        return{"status": "wrong password"}
+        return {"status": "wrong password"}
 
 
 @app.post("/register", include_in_schema=False)
@@ -187,12 +179,12 @@ def register(data: UserRegister):
     data = data.dict()
     user_table = UsersTable()
     if user_table.username_exists(data['username']):
-        return{"status": "username exists", "username": data['username']}
+        return {"status": "username exists", "username": data['username']}
     elif user_table.email_exists(data['email']):
-        return{"status": "email exists", "email": data['email']}
+        return {"status": "email exists", "email": data['email']}
     else:
         user_id = user_table.insert_user(**data)
-        return{"status": "registered", "user_id": user_id, "username": data['username']}
+        return {"status": "registered", "user_id": user_id, "username": data['username']}
 
 
 @app.post("/operation_point_save", include_in_schema=False)
@@ -462,6 +454,7 @@ async def core_compute_gapping_technical_drawing(request: Request):
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
+
 
 @app.post("/read_mas_database", include_in_schema=False)
 def read_mas_database():
