@@ -20,6 +20,9 @@ from pylatex.utils import NoEscape
 import PyMKF
 import random
 from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
+import hashlib
+
+temp_folder = "/opt/openmagnetics/temp"
 
 
 def clean_dimensions(core):
@@ -343,7 +346,7 @@ def core_get_families():
 def core_compute_shape(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
-    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")    
+    core_builder.set_output_path(temp_folder)    
     step_path, obj_path = core_builder.get_piece(coreShape)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
@@ -355,7 +358,7 @@ def core_compute_shape(coreShape: CoreShape):
 def core_compute_shape_stp(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
-    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")    
+    core_builder.set_output_path(temp_folder)    
     step_path, obj_path = core_builder.get_piece(coreShape)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
@@ -366,23 +369,41 @@ def core_compute_shape_stp(coreShape: CoreShape):
 @app.post("/core_compute_core_3d_model_obj", include_in_schema=False)
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
-    json = await request.json()
-    if 'familySubtype' in json['functionalDescription']['shape']:
-        json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
+    number_tries = 2
 
-    core = MagneticCore(**json)
-    core = core.dict()
+    while number_tries > 0:
+        json = await request.json()
 
-    core = clean_dimensions(core)
-    if not isinstance(core['functionalDescription']['material'], str):
-        core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
+        if 'familySubtype' in json['functionalDescription']['shape']:
+            json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
 
-    # pprint.pprint(core)
-    step_path, obj_path = ShapeBuilder().get_core(project_name=core['functionalDescription']['shape']['name'],
-                                                  geometrical_description=core['geometricalDescription'],
-                                                  output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
-    print(step_path)
-    print(obj_path)
+        core = MagneticCore(**json)
+        core = core.dict()
+
+        core = clean_dimensions(core)
+        if not isinstance(core['functionalDescription']['material'], str):
+            core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
+
+        # pprint.pprint(core)
+        aux = {
+            "core": core,
+        }
+        hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+        # print(hash_value)
+
+        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.obj"):
+            print("Core OBJ Hit!")
+            return FileResponse(f"{temp_folder}/cores/{hash_value}_core.obj")
+
+        step_path, obj_path = ShapeBuilder().get_core(project_name=hash_value,
+                                                      geometrical_description=core['geometricalDescription'],
+                                                      output_path=f"{temp_folder}/cores")
+        if step_path is None and number_tries > 0:
+            number_tries -= 1
+            continue
+
+        # print(step_path)
+        # print(obj_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -392,18 +413,34 @@ async def core_compute_core_3d_model(request: Request):
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
 async def core_compute_core_3d_model_stp(request: Request):
     json = await request.json()
-    if 'familySubtype' in json['functionalDescription']['shape']:
-        json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
+    number_tries = 2
 
-    core = MagneticCore(**json)
-    core = core.dict()
+    while number_tries > 0:
+        if 'familySubtype' in json['functionalDescription']['shape']:
+            json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
 
-    core = clean_dimensions(core)
-    step_path, obj_path = ShapeBuilder().get_core(project_name=core['functionalDescription']['shape']['name'],
-                                                  geometrical_description=core['geometricalDescription'],
-                                                  output_path=f"{os.getenv('LOCAL_DB_PATH')}/temp")
-    # print(step_path)
-    # print(obj_path)
+        core = MagneticCore(**json)
+        core = core.dict()
+
+        core = clean_dimensions(core)
+
+        aux = {
+            "core": core,
+        }
+        hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+
+        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stp"):
+            print("Hit!")
+            return FileResponse(f"{temp_folder}/cores/{hash_value}_core.stp")
+
+        step_path, obj_path = ShapeBuilder().get_core(project_name=hash_value,
+                                                      geometrical_description=core['geometricalDescription'],
+                                                      output_path=f"{temp_folder}/cores")
+        if step_path is None and number_tries > 0:
+            number_tries -= 1
+            continue
+        # print(step_path)
+        # print(obj_path)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
@@ -420,7 +457,7 @@ async def core_compute_technical_drawing(request: Request):
 
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
-    core_builder.set_output_path(f"{os.getenv('LOCAL_DB_PATH')}/temp")
+    core_builder.set_output_path(f"{temp_folder}/")
     colors = {
         "projection_color": "#d4d4d4",
         "dimension_color": "#d4d4d4"
@@ -530,12 +567,17 @@ def calculate_core_losses(magnetic: Magnetic, inputs: Inputs):
 @app.post("/plot_core_and_fields", include_in_schema=True)
 async def plot_core_and_fields(request: Request):
     data = await request.json()
-    random_id = random.random()
 
-    try:
-        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
-    except OSError:
-        pass
+    aux = {
+        "magnetic": data["magnetic"],
+        "operatingPoint": data["operatingPoint"],
+        "includeFringing": data["includeFringing"],
+    }
+    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+
+    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
+        print("Hit!")
+        return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = True
@@ -547,65 +589,69 @@ async def plot_core_and_fields(request: Request):
     settings["painterColorLines"] = "0x1a1a1a"
     settings["painterColorMargin"] = "0x7Ffff05b"
     PyMKF.set_settings(settings)
-    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"/opt/openmagnetics/ea_{random_id}.svg")
+    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
     timeout = 0
     current_size = 0
-    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
-        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
+    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
+        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
         time.sleep(0.01)
         timeout += 1
         print(timeout)
         if timeout == 1000:
             raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
+    return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
 
 @app.post("/plot_core", include_in_schema=True)
 async def plot_core(request: Request):
     data = await request.json()
-    random_id = random.random()
+    aux = {
+        "magnetic": data["magnetic"]
+    }
+    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
 
-    try:
-        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
-    except OSError:
-        pass
+    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
+        print("Plot core Hit!")
+        print(hash_value)
+        return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = True
     settings["painterAdvancedLitz"] = False
     settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
     PyMKF.set_settings(settings)
-    # print(data["magnetic"])
-    # print(len(data["magnetic"]["coil"]["turnsDescription"]))
-    PyMKF.plot_turns(data["magnetic"], f"/opt/openmagnetics/ea_{random_id}.svg")
+    PyMKF.plot_turns(data["magnetic"], f"{temp_folder}/{hash_value}.svg")
 
     timeout = 0
     current_size = 0
-    while not os.path.exists(f"/opt/openmagnetics/ea_{random_id}.svg"):
+    while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
         time.sleep(0.01)
         timeout += 1
         if timeout == 200:
             raise HTTPException(status_code=418, detail="Plotting timed out")
 
     timeout = 0
-    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
-        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
+    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
+        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
         time.sleep(0.01)
         timeout += 1
         if timeout == 1000:
             raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
+    return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
 
 @app.post("/plot_wire", include_in_schema=True)
 async def plot_wire(request: Request):
     data = await request.json()
-    random_id = random.random()
+    aux = {
+        "wire": data["wire"]
+    }
 
-    try:
-        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
-    except OSError:
-        pass
+    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+
+    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
+        print("Hit!")
+        return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = False
@@ -616,34 +662,38 @@ async def plot_wire(request: Request):
     PyMKF.set_settings(settings)
 
     # print(data["wire"])
-    PyMKF.plot_wire(data["wire"], f"/opt/openmagnetics/ea_{random_id}.svg", "/opt/openmagnetics/cci_coords/coordinates/")
+    PyMKF.plot_wire(data["wire"], f"{temp_folder}/{hash_value}.svg", "/opt/openmagnetics/cci_coords/coordinates/")
     timeout = 0
     current_size = 0
-    while not os.path.exists(f"/opt/openmagnetics/ea_{random_id}.svg"):
+    while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
         time.sleep(0.01)
         timeout += 1
         if timeout == 200:
             raise HTTPException(status_code=418, detail="Plotting timed out")
 
     timeout = 0
-    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
-        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
+    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
+        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
         time.sleep(0.01)
         timeout += 1
         if timeout == 1000:
             raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
+    return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
 
 @app.post("/plot_wire_and_current_density", include_in_schema=True)
 async def plot_wire_and_current_density(request: Request):
     data = await request.json()
-    random_id = random.random()
+    aux = {
+        "wire": data["wire"],
+        "operatingPoint": data["operatingPoint"],
+    }
 
-    try:
-        os.remove(f"/opt/openmagnetics/ea_{random_id}.svg")
-    except OSError:
-        pass
+    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+
+    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
+        print("Hit!")
+        return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = False
@@ -651,23 +701,23 @@ async def plot_wire_and_current_density(request: Request):
     settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
     PyMKF.set_settings(settings)
 
-    PyMKF.plot_current_density(data["wire"], data["operatingPoint"], f"/opt/openmagnetics/ea_{random_id}.svg")
+    PyMKF.plot_current_density(data["wire"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
     timeout = 0
     current_size = 0
-    while not os.path.exists(f"/opt/openmagnetics/ea_{random_id}.svg"):
+    while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
         time.sleep(0.01)
         timeout += 1
         if timeout == 200:
             raise HTTPException(status_code=418, detail="Plotting timed out")
 
     timeout = 0
-    while os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size == 0 or current_size != os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size:
-        current_size = os.stat(f"/opt/openmagnetics/ea_{random_id}.svg").st_size
+    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
+        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
         time.sleep(0.01)
         timeout += 1
         if timeout == 1000:
             raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"/opt/openmagnetics/ea_{random_id}.svg")
+    return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
 
 @app.post("/insert_mas", include_in_schema=False)

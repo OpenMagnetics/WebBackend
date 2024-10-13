@@ -1142,13 +1142,21 @@ class SaturationElement(BaseModel):
     """temperature for the field value, in Celsius"""
 
 
-class MaterialComposition(Enum):
+class MaterialEnum(Enum):
     """The composition of a magnetic material"""
+
     amorphous = "amorphous"
     electricalSteel = "electricalSteel"
     ferrite = "ferrite"
     nanocrystalline = "nanocrystalline"
     powder = "powder"
+
+
+class MaterialCompositionEnum(Enum):
+    """The composition of a magnetic material"""
+
+    MnZn = "MnZn"
+    NiZn = "NiZn"
 
 
 class FrequencyFactor(BaseModel):
@@ -1380,36 +1388,52 @@ class CoreMaterial(BaseModel):
     class Config:  
         use_enum_values = True
     """A material for the magnetic cores"""
+
     manufacturerInfo: ManufacturerInfo
-    materialComposition: MaterialComposition
+    material: MaterialEnum
     """The composition of a magnetic material"""
+
     name: str
     """The name of a magnetic material"""
+
     permeability: Permeabilities
     """The data regarding the relative permeability of a magnetic material"""
+
     resistivity: List[ResistivityPoint]
     """Resistivity value according to manufacturer"""
+
     saturation: List[SaturationElement]
     """BH Cycle points where a non-negligible increase in magnetic field produces a negligible
     increase of magnetic flux density
     """
     type: CoreMaterialType
     """The type of a magnetic material"""
+
     volumetricLosses: Dict[str, List[Union[CoreLossesMethodData, List[VolumetricLossesPoint]]]]
     """The data regarding the volumetric losses of a magnetic material"""
+
     bhCycle: Optional[List[SaturationElement]] = None
     coerciveForce: Optional[List[SaturationElement]] = None
     """BH Cycle points where the magnetic flux density is 0"""
+
     curieTemperature: Optional[float] = None
     """The temperature at which this material losses all ferromagnetism"""
+
     density: Optional[float] = None
     """Density value according to manufacturer, in kg/m3"""
+
     family: Optional[str] = None
     """The family of a magnetic material according to its manufacturer"""
+
     heatCapacity: Optional[DimensionWithTolerance] = None
     """Heat capacity value according to manufacturer, in J/Kg/K"""
+
     heatConductivity: Optional[DimensionWithTolerance] = None
     """Heat conductivity value according to manufacturer, in W/m/K"""
+
+    materialComposition: Optional[MaterialCompositionEnum] = None
+    """The composition of a magnetic material"""
+
     remanence: Optional[List[SaturationElement]] = None
     """BH Cycle points where the magnetic field is 0"""
 
