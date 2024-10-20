@@ -1,4 +1,4 @@
-sqlalchemy==1.4.46
+sqlalchemy
 pandas
 numpy
 pydantic

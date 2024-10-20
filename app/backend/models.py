@@ -697,3 +697,39 @@ class MasTable(Database):
         self.session.commit()
         self.disconnect()
         return mas_id
+
+
+class IntermediateMasTable(Database):
+
+    def connect(self, schema='public'):
+        driver = "postgresql"
+        address = os.getenv('OM_USERS_DB_ADDRESS')
+        port = os.getenv('OM_USERS_DB_PORT')
+        name = os.getenv('OM_USERS_DB_NAME')
+        user = os.getenv('OM_USERS_DB_USER')
+        password = os.getenv('OM_USERS_DB_PASSWORD')
+
+        self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
+
+        metadata = sqlalchemy.MetaData()
+        metadata.reflect(self.engine, schema=schema)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.intermediate_mas
+
+    def insert_mas(self, mas):
+        self.connect()
+        data = {
+            'mas': mas,
+            'created_at': datetime.datetime.now()
+        }
+        row = self.Table(**data)
+        self.session.add(row)
+        self.session.flush()
+        mas_id = row.index
+        self.session.commit()
+        self.disconnect()
+        return mas_id

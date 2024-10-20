@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Request, HTTPException
-from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable, MasTable
+from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable, MasTable, IntermediateMasTable
 from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
 from app.backend.models import Vote, UserLogin, UserRegister, OperationPointSlug, Username, BugReport
 from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
@@ -101,6 +101,7 @@ app = FastAPI()
 
 origins = [
     "https://openmagnetics.com",
+    "https://beta.openmagnetics.com",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:4173",
@@ -477,12 +478,27 @@ async def plot_wire_and_current_density(request: Request):
     return FileResponse(f"{temp_folder}/{hash_value}.svg")
 
 
-@app.post("/insert_mas", include_in_schema=False)
-async def insert_mas(request: Request):
-    data = await request.json()
-
-    print("Inserting")
-
+def insert_mas_background(data):
     mas_table = MasTable()
-    mas_id = mas_table.insert_mas(data)
-    return mas_id
+    mas_table.insert_mas(data)
+
+
+@app.post("/insert_mas", include_in_schema=False)
+async def insert_mas(request: Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+    background_tasks.add_task(insert_mas_background, data)
+
+    return "Inserting in the background"
+
+
+def insert_intermediate_mas_background(data):
+    mas_table = IntermediateMasTable()
+    mas_table.insert_mas(data)
+
+
+@app.post("/insert_intermediate_mas", include_in_schema=False)
+async def insert_intermediate_mas(request: Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+    background_tasks.add_task(insert_intermediate_mas_background, data)
+
+    return "Inserting in the background"
