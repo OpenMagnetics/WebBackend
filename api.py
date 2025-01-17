@@ -4,7 +4,8 @@ from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinS
 from app.backend.models import Vote, UserLogin, UserRegister, OperationPointSlug, Username, BugReport
 from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from fastapi.encoders import jsonable_encoder
 import pandas
 from datetime import datetime
 import json
@@ -137,17 +138,17 @@ def report_bug(data: BugReport):
     return {"status": "reported", "bug_report_id": bug_report_id}
 
 
-@app.post("/core_compute_shape_obj", include_in_schema=False)
+@app.post("/core_compute_shape_stl", include_in_schema=False)
 @app.post("/core_compute_shape", include_in_schema=False)
 def core_compute_shape(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
     core_builder.set_output_path(temp_folder)    
-    step_path, obj_path = core_builder.get_piece(coreShape)
+    step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        return FileResponse(obj_path)
+        return FileResponse(stl_path)
 
 
 @app.post("/core_compute_shape_stp", include_in_schema=False)
@@ -155,14 +156,14 @@ def core_compute_shape_stp(coreShape: CoreShape):
     coreShape = coreShape.dict()
     core_builder = ShapeBuilder().factory(coreShape)
     core_builder.set_output_path(temp_folder)    
-    step_path, obj_path = core_builder.get_piece(coreShape)
+    step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(step_path)
 
 
-@app.post("/core_compute_core_3d_model_obj", include_in_schema=False)
+@app.post("/core_compute_core_3d_model_stl", include_in_schema=False)
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
     number_tries = 2
@@ -187,23 +188,29 @@ async def core_compute_core_3d_model(request: Request):
         hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
         # print(hash_value)
 
-        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.obj"):
-            print("Core OBJ Hit!")
-            return FileResponse(f"{temp_folder}/cores/{hash_value}_core.obj")
+        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stl"):
+            print("Core stl Hit!")
+            with open(f"{temp_folder}/cores/{hash_value}_core.stl", "rb") as stl:
+                stl_data = stl.read()
+                json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+                return json_compatible_item_data
 
-        step_path, obj_path = ShapeBuilder().get_core(project_name=hash_value,
+        step_path, stl_path = ShapeBuilder().get_core(project_name=hash_value,
                                                       geometrical_description=core['geometricalDescription'],
                                                       output_path=f"{temp_folder}/cores")
-        if obj_path is None and number_tries > 0:
+        if stl_path is None and number_tries > 0:
             number_tries -= 1
             continue
 
         break
 
-    if obj_path is None:
+    if stl_path is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        return FileResponse(obj_path)
+        with open(stl_path, "rb") as stl:
+            stl_data = stl.read()
+            json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+            return json_compatible_item_data
 
 
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
@@ -229,7 +236,7 @@ async def core_compute_core_3d_model_stp(request: Request):
             print("Hit!")
             return FileResponse(f"{temp_folder}/cores/{hash_value}_core.stp")
 
-        step_path, obj_path = ShapeBuilder().get_core(project_name=hash_value,
+        step_path, stl_path = ShapeBuilder().get_core(project_name=hash_value,
                                                       geometrical_description=core['geometricalDescription'],
                                                       output_path=f"{temp_folder}/cores")
         if step_path is None and number_tries > 0:
