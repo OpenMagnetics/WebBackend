@@ -1155,8 +1155,16 @@ class MaterialEnum(Enum):
 class MaterialCompositionEnum(Enum):
     """The composition of a magnetic material"""
 
+    FeMo = "FeMo"
+    FeNi = "FeNi"
+    FeNiMo = "FeNiMo"
+    FeSi = "FeSi"
+    FeSiAl = "FeSiAl"
+    Iron = "Iron"
+    MgZn = "MgZn"
     MnZn = "MnZn"
     NiZn = "NiZn"
+    Proprietary = "Proprietary"
 
 
 class FrequencyFactor(BaseModel):
