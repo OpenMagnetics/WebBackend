@@ -354,7 +354,8 @@ async def plot_core_and_fields(request: Request):
     settings["painterColorLines"] = "0x1a1a1a"
     settings["painterColorMargin"] = "0x7Ffff05b"
     PyMKF.set_settings(settings)
-    PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
+    result = PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
+    print(result)
     timeout = 0
     current_size = 0
     while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
@@ -509,3 +510,14 @@ async def insert_intermediate_mas(request: Request, background_tasks: Background
     background_tasks.add_task(insert_intermediate_mas_background, data)
 
     return "Inserting in the background"
+
+
+@app.post("/load_external_core_materials", include_in_schema=False)
+async def load_external_core_materials(request: Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+
+    external_core_materials_string = data["coreMaterialsString"]
+
+    PyMKF.load_core_materials(external_core_materials_string)
+    PyMKF.load_core_materials("")
+    return "Data loaded"
