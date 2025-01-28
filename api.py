@@ -521,3 +521,29 @@ async def load_external_core_materials(request: Request, background_tasks: Backg
     PyMKF.load_core_materials(external_core_materials_string)
     PyMKF.load_core_materials("")
     return "Data loaded"
+
+
+@app.post("/store_request", include_in_schema=False)
+async def store_request(request: Request, background_tasks: BackgroundTasks):
+    data = await request.json()
+
+    request = {
+        "email": data["email"],
+        "name": data["name"],
+        "mas": data["mas"],
+    }
+
+    file = "/opt/openmagnetics/temp/requests.csv"
+
+    requests = pandas.DataFrame()
+
+    if os.path.exists(file):
+        requests = pandas.read_csv(file)
+
+    row = pandas.DataFrame([request])
+    print(row)
+
+    requests = pandas.concat([requests, row], ignore_index=True)
+    print(requests)
+
+    requests.to_csv(file)
