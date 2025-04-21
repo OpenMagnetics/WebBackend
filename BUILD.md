@@ -7,3 +7,7 @@ sudo apt install texlive-latex-extra
 
 sudo mkdir /opt/openmagnetics
 sudo chmod -R 777 /opt/openmagnetics
+
+
+    # Comment line 31 from /usr/share/freecad-daily/Mod/Draft/draftutils/params.py if it crashes at import
+    # import Arch_rc

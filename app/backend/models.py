@@ -180,11 +180,11 @@ class UsersTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"
-        address = os.getenv('OM_USERS_DB_ADDRESS')
-        port = os.getenv('OM_USERS_DB_PORT')
-        name = os.getenv('OM_USERS_DB_NAME')
-        user = os.getenv('OM_USERS_DB_USER')
-        password = os.getenv('OM_USERS_DB_PASSWORD')
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
 
         self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
 
@@ -277,11 +277,11 @@ class BugReportsTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"
-        address = os.getenv('OM_USERS_DB_ADDRESS')
-        port = os.getenv('OM_USERS_DB_PORT')
-        name = os.getenv('OM_USERS_DB_NAME')
-        user = os.getenv('OM_USERS_DB_USER')
-        password = os.getenv('OM_USERS_DB_PASSWORD')
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
 
         self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
 
@@ -667,11 +667,11 @@ class MasTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"
-        address = os.getenv('OM_USERS_DB_ADDRESS')
-        port = os.getenv('OM_USERS_DB_PORT')
-        name = os.getenv('OM_USERS_DB_NAME')
-        user = os.getenv('OM_USERS_DB_USER')
-        password = os.getenv('OM_USERS_DB_PASSWORD')
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
 
         self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
 
@@ -703,11 +703,11 @@ class IntermediateMasTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"
-        address = os.getenv('OM_USERS_DB_ADDRESS')
-        port = os.getenv('OM_USERS_DB_PORT')
-        name = os.getenv('OM_USERS_DB_NAME')
-        user = os.getenv('OM_USERS_DB_USER')
-        password = os.getenv('OM_USERS_DB_PASSWORD')
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
 
         self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
 

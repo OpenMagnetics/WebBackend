@@ -20,6 +20,9 @@ from pylatex import Document, Command, Package
 from pylatex.utils import NoEscape
 import PyMKF
 from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
+# import sys
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MVB/src/OpenMagneticsVirtualBuilder')))
+from builder import Builder as ShapeBuilder  # noqa: E402
 import hashlib
 
 temp_folder = "/opt/openmagnetics/temp"
@@ -27,7 +30,7 @@ temp_folder = "/opt/openmagnetics/temp"
 
 def clean_dimensions(core):
     # Make sure no unwanted dimension gets in
-    families = ShapeBuilder().get_families()
+    families = ShapeBuilder("FreeCAD").get_families()
     if "familySubtype" in core['functionalDescription']['shape'] and core['functionalDescription']['shape']['familySubtype'] is not None:
         dimensions = families[core['functionalDescription']['shape']['family']][int(core['functionalDescription']['shape']['familySubtype'])]
     else:
@@ -142,7 +145,7 @@ def report_bug(data: BugReport):
 @app.post("/core_compute_shape", include_in_schema=False)
 def core_compute_shape(coreShape: CoreShape):
     coreShape = coreShape.dict()
-    core_builder = ShapeBuilder().factory(coreShape)
+    core_builder = ShapeBuilder("FreeCAD").factory(coreShape)
     core_builder.set_output_path(temp_folder)    
     step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
@@ -154,7 +157,7 @@ def core_compute_shape(coreShape: CoreShape):
 @app.post("/core_compute_shape_stp", include_in_schema=False)
 def core_compute_shape_stp(coreShape: CoreShape):
     coreShape = coreShape.dict()
-    core_builder = ShapeBuilder().factory(coreShape)
+    core_builder = ShapeBuilder("FreeCAD").factory(coreShape)
     core_builder.set_output_path(temp_folder)    
     step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
@@ -195,9 +198,9 @@ async def core_compute_core_3d_model(request: Request):
                 json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
                 return json_compatible_item_data
 
-        step_path, stl_path = ShapeBuilder().get_core(project_name=hash_value,
-                                                      geometrical_description=core['geometricalDescription'],
-                                                      output_path=f"{temp_folder}/cores")
+        step_path, stl_path = ShapeBuilder("FreeCAD").get_core(project_name=hash_value,
+                                                               geometrical_description=core['geometricalDescription'],
+                                                               output_path=f"{temp_folder}/cores")
         if stl_path is None and number_tries > 0:
             number_tries -= 1
             continue
@@ -236,9 +239,9 @@ async def core_compute_core_3d_model_stp(request: Request):
             print("Hit!")
             return FileResponse(f"{temp_folder}/cores/{hash_value}_core.stp")
 
-        step_path, stl_path = ShapeBuilder().get_core(project_name=hash_value,
-                                                      geometrical_description=core['geometricalDescription'],
-                                                      output_path=f"{temp_folder}/cores")
+        step_path, stl_path = ShapeBuilder("FreeCAD").get_core(project_name=hash_value,
+                                                               geometrical_description=core['geometricalDescription'],
+                                                               output_path=f"{temp_folder}/cores")
         if step_path is None and number_tries > 0:
             number_tries -= 1
             continue
@@ -253,14 +256,14 @@ async def core_compute_core_3d_model_stp(request: Request):
 
 @app.post("/core_compute_technical_drawing", include_in_schema=False)
 async def core_compute_technical_drawing(request: Request):
-    json = await request.json()
-    if 'familySubtype' in json:
-        json['familySubtype'] = str(json['familySubtype'])
+    dataJson = await request.json()
+    if 'familySubtype' in dataJson:
+        dataJson['familySubtype'] = str(dataJson['familySubtype'])
 
-    coreShape = CoreShape(**json)
+    coreShape = CoreShape(**dataJson)
 
     coreShape = coreShape.dict()
-    core_builder = ShapeBuilder().factory(coreShape)
+    core_builder = ShapeBuilder("FreeCAD").factory(coreShape)
     core_builder.set_output_path(f"{temp_folder}/")
     colors = {
         "projection_color": "#d4d4d4",
@@ -275,11 +278,11 @@ async def core_compute_technical_drawing(request: Request):
 
 @app.post("/core_compute_gapping_technical_drawing", include_in_schema=False)
 async def core_compute_gapping_technical_drawing(request: Request):
-    json = await request.json()
-    if 'familySubtype' in json['functionalDescription']['shape']:
-        json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
+    dataJson = await request.json()
+    if 'familySubtype' in dataJson['functionalDescription']['shape']:
+        dataJson['functionalDescription']['shape']['familySubtype'] = str(dataJson['functionalDescription']['shape']['familySubtype'])
 
-    core = MagneticCore(**json)
+    core = MagneticCore(**dataJson)
     core = core.dict()
 
     colors = {
@@ -287,10 +290,10 @@ async def core_compute_gapping_technical_drawing(request: Request):
         "dimension_color": "#d4d4d4"
     }
 
-    views = ShapeBuilder().get_core_gapping_technical_drawing(project_name=core['functionalDescription']['shape']['name'],
-                                                              core_data=core,
-                                                              colors=colors,
-                                                              save_files=False)
+    views = ShapeBuilder("FreeCAD").get_core_gapping_technical_drawing(project_name=core['functionalDescription']['shape']['name'],
+                                                                       core_data=core,
+                                                                       colors=colors,
+                                                                       save_files=False)
     if views['front_view'] is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
