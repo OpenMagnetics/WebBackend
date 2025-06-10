@@ -5,7 +5,7 @@ import hashlib
 import PyMKF
 import time
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-from mas_models import MagneticCore
+from mas_models import MagneticCore, CoreShape
 from celery import Celery
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../MVB/src/OpenMagneticsVirtualBuilder')))
 from builder import Builder as ShapeBuilder  # noqa: E402
@@ -29,7 +29,7 @@ def clean_dimensions(core):
 
 
 @app.task
-def task_generate_core_3d_model(core, temp_folder):
+def task_generate_core_3d_model(core, temp_folder, stl_or_not_step=True):
     if 'familySubtype' in core['functionalDescription']['shape']:
         core['functionalDescription']['shape']['familySubtype'] = str(core['functionalDescription']['shape']['familySubtype'])
 
@@ -47,22 +47,31 @@ def task_generate_core_3d_model(core, temp_folder):
     hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
     # print(hash_value)
 
-    if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stl"):
-        print("Core stl Hit!")
-        with open(f"{temp_folder}/cores/{hash_value}_core.stl", "rb") as stl:
-            stl_data = stl.read()
-            return stl_data
+    if stl_or_not_step:
+        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stl"):
+            print("Core stl Hit!")
+            with open(f"{temp_folder}/cores/{hash_value}_core.stl", "rb") as stl:
+                stl_data = stl.read()
+                return stl_data
+    else:
+        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stp"):
+            print("Core stp Hit!")
+            with open(f"{temp_folder}/cores/{hash_value}_core.stp", "rb") as stp:
+                stp_data = stp.read()
+                return stp_data
 
     step_path, stl_path = ShapeBuilder("FreeCAD").get_core(project_name=hash_value,
                                                            geometrical_description=core['geometricalDescription'],
                                                            output_path=f"{temp_folder}/cores")
-    print(stl_path)
-    if stl_path is None:
+    path = stl_path if stl_or_not_step else step_path
+
+    print(path)
+    if path is None:
         return None
 
-    with open(stl_path, "rb") as stl:
-        stl_data = stl.read()
-        return stl_data
+    with open(path, "rb") as stl:
+        data = stl.read()
+        return data
 
 
 @app.task
@@ -223,3 +232,49 @@ def task_plot_wire_and_current_density(data, temp_folder):
         if timeout == 1000:
             return None
     return f"{temp_folder}/{hash_value}.svg"
+
+
+@app.task
+def task_generate_core_technical_drawing(data, temp_folder):
+    if 'familySubtype' in data:
+        data['familySubtype'] = str(data['familySubtype'])
+
+    coreShape = CoreShape(**data)
+
+    coreShape = coreShape.dict()
+    core_builder = ShapeBuilder("FreeCAD").factory(coreShape)
+    core_builder.set_output_path(f"{temp_folder}/")
+    colors = {
+        "projection_color": "#d4d4d4",
+        "dimension_color": "#d4d4d4"
+    }
+    views = core_builder.get_piece_technical_drawing(coreShape, colors)
+
+    if views['top_view'] is None or views['front_view'] is None:
+        return None
+    else:
+        return views
+
+
+@app.task
+def task_generate_gapping_technical_drawing(data, temp_folder):
+    if 'familySubtype' in data['functionalDescription']['shape']:
+        data['functionalDescription']['shape']['familySubtype'] = str(data['functionalDescription']['shape']['familySubtype'])
+
+    core = MagneticCore(**data)
+    core = core.dict()
+
+    colors = {
+        "projection_color": "#d4d4d4",
+        "dimension_color": "#d4d4d4"
+    }
+
+    views = ShapeBuilder("FreeCAD").get_core_gapping_technical_drawing(project_name=core['functionalDescription']['shape']['name'],
+                                                                       core_data=core,
+                                                                       colors=colors,
+                                                                       save_files=False)
+
+    if views['top_view'] is None or views['front_view'] is None:
+        return None
+    else:
+        return views

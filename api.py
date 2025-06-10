@@ -25,6 +25,7 @@ from builder import Builder as ShapeBuilder  # noqa: E402
 import hashlib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'app/backend')))
 from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
+from plotter import task_generate_core_technical_drawing, task_generate_gapping_technical_drawing
 
 temp_folder = "/opt/openmagnetics/temp"
 
@@ -143,9 +144,14 @@ def core_compute_shape_stp(coreShape: CoreShape):
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
     core = await request.json()
+    number_retries = 5
 
-    result = task_generate_core_3d_model.delay(core, temp_folder)
-    stl_data = result.get(timeout=60)
+    for retry in range(number_retries):
+        result = task_generate_core_3d_model.delay(core, temp_folder)
+        stl_data = result.get(timeout=10)
+        if stl_data is not None:
+            break
+        print("Retrying task_generate_core_3d_model")
 
     if stl_data is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
@@ -156,59 +162,36 @@ async def core_compute_core_3d_model(request: Request):
 
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
 async def core_compute_core_3d_model_stp(request: Request):
-    json = await request.json()
-    number_tries = 2
+    core = await request.json()
+    number_retries = 5
 
-    while number_tries > 0:
-        if 'familySubtype' in json['functionalDescription']['shape']:
-            json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
+    for retry in range(number_retries):
+        result = task_generate_core_3d_model.delay(core, temp_folder, False)
+        stl_data = result.get(timeout=10)
+        if stl_data is not None:
+            break
+        print("Retrying task_generate_core_3d_model")
 
-        core = MagneticCore(**json)
-        core = core.dict()
-
-        core = clean_dimensions(core)
-
-        aux = {
-            "core": core,
-        }
-        hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
-
-        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stp"):
-            print("Hit!")
-            return FileResponse(f"{temp_folder}/cores/{hash_value}_core.stp")
-
-        step_path, stl_path = ShapeBuilder("FreeCAD").get_core(project_name=hash_value,
-                                                               geometrical_description=core['geometricalDescription'],
-                                                               output_path=f"{temp_folder}/cores")
-        if step_path is None and number_tries > 0:
-            number_tries -= 1
-            continue
-        
-        break
-
-    if step_path is None:
+    if stl_data is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        return FileResponse(step_path)
+        json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+        return json_compatible_item_data
 
 
 @app.post("/core_compute_technical_drawing", include_in_schema=False)
 async def core_compute_technical_drawing(request: Request):
-    dataJson = await request.json()
-    if 'familySubtype' in dataJson:
-        dataJson['familySubtype'] = str(dataJson['familySubtype'])
+    data = await request.json()
+    number_retries = 5
 
-    coreShape = CoreShape(**dataJson)
+    for retry in range(number_retries):
+        result = task_generate_core_technical_drawing.delay(data, temp_folder)
+        views = result.get(timeout=10)
+        if views is not None:
+            break
+        print("Retrying task_generate_core_technical_drawing")
 
-    coreShape = coreShape.dict()
-    core_builder = ShapeBuilder("FreeCAD").factory(coreShape)
-    core_builder.set_output_path(f"{temp_folder}/")
-    colors = {
-        "projection_color": "#d4d4d4",
-        "dimension_color": "#d4d4d4"
-    }
-    views = core_builder.get_piece_technical_drawing(coreShape, colors)
-    if views['top_view'] is None or views['front_view'] is None:
+    if views is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
@@ -216,23 +199,17 @@ async def core_compute_technical_drawing(request: Request):
 
 @app.post("/core_compute_gapping_technical_drawing", include_in_schema=False)
 async def core_compute_gapping_technical_drawing(request: Request):
-    dataJson = await request.json()
-    if 'familySubtype' in dataJson['functionalDescription']['shape']:
-        dataJson['functionalDescription']['shape']['familySubtype'] = str(dataJson['functionalDescription']['shape']['familySubtype'])
+    data = await request.json()
+    number_retries = 5
 
-    core = MagneticCore(**dataJson)
-    core = core.dict()
+    for retry in range(number_retries):
+        result = task_generate_gapping_technical_drawing.delay(data, temp_folder)
+        views = result.get(timeout=10)
+        if views is not None:
+            break
+        print("Retrying task_generate_gapping_technical_drawing")
 
-    colors = {
-        "projection_color": "#d4d4d4",
-        "dimension_color": "#d4d4d4"
-    }
-
-    views = ShapeBuilder("FreeCAD").get_core_gapping_technical_drawing(project_name=core['functionalDescription']['shape']['name'],
-                                                                       core_data=core,
-                                                                       colors=colors,
-                                                                       save_files=False)
-    if views['front_view'] is None:
+    if views is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
@@ -273,9 +250,14 @@ async def process_latex(request: Request):
 @app.post("/plot_core_and_fields", include_in_schema=True)
 async def plot_core_and_fields(request: Request):
     data = await request.json()
+    number_retries = 5
 
-    result = task_plot_core_and_fields.delay(data, temp_folder)
-    plot = result.get(timeout=60)
+    for retry in range(number_retries):
+        result = task_plot_core_and_fields.delay(data, temp_folder)
+        plot = result.get(timeout=10)
+        if plot is not None:
+            break
+        print("Retrying plot_core_and_fields")
 
     if plot is None:
         raise HTTPException(status_code=418, detail="Plotting timed out")
@@ -286,9 +268,14 @@ async def plot_core_and_fields(request: Request):
 @app.post("/plot_core", include_in_schema=True)
 async def plot_core(request: Request):
     data = await request.json()
+    number_retries = 5
 
-    result = task_plot_core.delay(data, temp_folder)
-    plot = result.get(timeout=60)
+    for retry in range(number_retries):
+        result = task_plot_core.delay(data, temp_folder)
+        plot = result.get(timeout=10)
+        if plot is not None:
+            break
+        print("Retrying task_plot_core")
 
     if plot is None:
         raise HTTPException(status_code=418, detail="Plotting timed out")
@@ -299,9 +286,14 @@ async def plot_core(request: Request):
 @app.post("/plot_wire", include_in_schema=True)
 async def plot_wire(request: Request):
     data = await request.json()
+    number_retries = 5
 
-    result = task_plot_wire.delay(data, temp_folder)
-    plot = result.get(timeout=60)
+    for retry in range(number_retries):
+        result = task_plot_wire.delay(data, temp_folder)
+        plot = result.get(timeout=10)
+        if plot is not None:
+            break
+        print("Retrying task_plot_wire")
 
     if plot is None:
         raise HTTPException(status_code=418, detail="Plotting timed out")
@@ -312,9 +304,14 @@ async def plot_wire(request: Request):
 @app.post("/plot_wire_and_current_density", include_in_schema=True)
 async def plot_wire_and_current_density(request: Request):
     data = await request.json()
+    number_retries = 5
 
-    result = task_plot_wire_and_current_density.delay(data, temp_folder)
-    plot = result.get(timeout=60)
+    for retry in range(number_retries):
+        result = task_plot_wire_and_current_density.delay(data, temp_folder)
+        plot = result.get(timeout=10)
+        if plot is not None:
+            break
+        print("Retrying task_plot_wire_and_current_density")
 
     if plot is None:
         raise HTTPException(status_code=418, detail="Plotting timed out")

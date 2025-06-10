@@ -13,4 +13,4 @@ shiboken2
 pylatex
 OpenMagneticsVirtualBuilder
 fastapi[standard]
-celery[redis]
+celery
