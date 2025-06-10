@@ -154,6 +154,8 @@ async def core_compute_core_3d_model(request: Request):
             stl_data = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
             continue
+        except ConnectionResetError:
+            continue
         if stl_data is not None:
             break
         print("Retrying task_generate_core_3d_model")
@@ -176,6 +178,8 @@ async def core_compute_core_3d_model_stp(request: Request):
         try:
             stp_data = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
             continue
         if stp_data is not None:
             break
@@ -200,6 +204,8 @@ async def core_compute_technical_drawing(request: Request):
             views = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
             continue
+        except ConnectionResetError:
+            continue
         if views is not None:
             break
         print("Retrying task_generate_core_technical_drawing")
@@ -221,6 +227,8 @@ async def core_compute_gapping_technical_drawing(request: Request):
         try:
             views = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
             continue
         if views is not None:
             break
@@ -276,6 +284,8 @@ async def plot_core_and_fields(request: Request):
             plot = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
             continue
+        except ConnectionResetError:
+            continue
         if plot is not None:
             break
         print("Retrying plot_core_and_fields")
@@ -297,6 +307,8 @@ async def plot_core(request: Request):
         try:
             plot = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
             continue
         if plot is not None:
             break
@@ -320,6 +332,8 @@ async def plot_wire(request: Request):
             plot = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
             continue
+        except ConnectionResetError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_wire")
@@ -341,6 +355,8 @@ async def plot_wire_and_current_density(request: Request):
         try:
             plot = result.get(timeout=10)
         except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
             continue
         if plot is not None:
             break
