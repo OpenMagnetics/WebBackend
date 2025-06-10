@@ -15,6 +15,7 @@ import os
 import pathlib
 import base64
 import time
+import celery
 from pylatex import Document, Command, Package
 from pylatex.utils import NoEscape
 import PyMKF
@@ -148,7 +149,10 @@ async def core_compute_core_3d_model(request: Request):
 
     for retry in range(number_retries):
         result = task_generate_core_3d_model.delay(core, temp_folder)
-        stl_data = result.get(timeout=10)
+        try:
+            stl_data = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if stl_data is not None:
             break
         print("Retrying task_generate_core_3d_model")
@@ -167,7 +171,10 @@ async def core_compute_core_3d_model_stp(request: Request):
 
     for retry in range(number_retries):
         result = task_generate_core_3d_model.delay(core, temp_folder, False)
-        stl_data = result.get(timeout=10)
+        try:
+            stl_data = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if stl_data is not None:
             break
         print("Retrying task_generate_core_3d_model")
@@ -186,7 +193,10 @@ async def core_compute_technical_drawing(request: Request):
 
     for retry in range(number_retries):
         result = task_generate_core_technical_drawing.delay(data, temp_folder)
-        views = result.get(timeout=10)
+        try:
+            views = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if views is not None:
             break
         print("Retrying task_generate_core_technical_drawing")
@@ -204,7 +214,10 @@ async def core_compute_gapping_technical_drawing(request: Request):
 
     for retry in range(number_retries):
         result = task_generate_gapping_technical_drawing.delay(data, temp_folder)
-        views = result.get(timeout=10)
+        try:
+            views = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if views is not None:
             break
         print("Retrying task_generate_gapping_technical_drawing")
@@ -254,7 +267,10 @@ async def plot_core_and_fields(request: Request):
 
     for retry in range(number_retries):
         result = task_plot_core_and_fields.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if plot is not None:
             break
         print("Retrying plot_core_and_fields")
@@ -272,7 +288,10 @@ async def plot_core(request: Request):
 
     for retry in range(number_retries):
         result = task_plot_core.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_core")
@@ -290,7 +309,10 @@ async def plot_wire(request: Request):
 
     for retry in range(number_retries):
         result = task_plot_wire.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_wire")
@@ -308,7 +330,10 @@ async def plot_wire_and_current_density(request: Request):
 
     for retry in range(number_retries):
         result = task_plot_wire_and_current_density.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_wire_and_current_density")
