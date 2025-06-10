@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from app.backend.models import UsersTable, NotificationsTable, BugReportsTable, RoadmapVotesTable, OperationPointsTable, CoresTable, BobbinsTable, WiresTable, MagneticsTable, MasTable, IntermediateMasTable
-from app.backend.models import OperationPointSlugsTable, CoreSlugsTable, BobbinSlugsTable, WireSlugsTable, MagneticSlugsTable
-from app.backend.models import Vote, UserLogin, UserRegister, OperationPointSlug, Username, BugReport
+from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, CoreMaterialsTable
+from app.backend.models import BugReport
 from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -19,11 +18,13 @@ import time
 from pylatex import Document, Command, Package
 from pylatex.utils import NoEscape
 import PyMKF
-from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
-# import sys
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MVB/src/OpenMagneticsVirtualBuilder')))
+# from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MVB/src/OpenMagneticsVirtualBuilder')))
 from builder import Builder as ShapeBuilder  # noqa: E402
 import hashlib
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'app/backend')))
+from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
 
 temp_folder = "/opt/openmagnetics/temp"
 
@@ -71,34 +72,6 @@ def flatten_dimensions(data):
     dim = {k: v["nominal"] for k, v in dimensions.items()}
     data["dimensions"] = dim
     return data
-
-
-def get_table(url):
-    for chunk in url.split("/")[3:]:
-        if "operation_point" in chunk:
-            return OperationPointsTable()
-        if "core" in chunk:
-            return CoresTable()
-        if "bobbin" in chunk:
-            return BobbinsTable()
-        if "wire" in chunk:
-            return WiresTable()
-        if "magnetic" in chunk:
-            return MagneticsTable()
-
-
-def get_table_slug(url):
-    for chunk in url.split("/")[3:]:
-        if "operation_point" in chunk:
-            return OperationPointSlugsTable()
-        if "core" in chunk:
-            return CoreSlugsTable()
-        if "bobbin" in chunk:
-            return BobbinSlugsTable()
-        if "wire" in chunk:
-            return WireSlugsTable()
-        if "magnetic" in chunk:
-            return MagneticSlugsTable()
 
 
 app = FastAPI()
@@ -169,51 +142,16 @@ def core_compute_shape_stp(coreShape: CoreShape):
 @app.post("/core_compute_core_3d_model_stl", include_in_schema=False)
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
-    number_tries = 2
+    core = await request.json()
 
-    while number_tries > 0:
-        json = await request.json()
+    result = task_generate_core_3d_model.delay(core, temp_folder)
+    stl_data = result.get(timeout=60)
 
-        if 'familySubtype' in json['functionalDescription']['shape']:
-            json['functionalDescription']['shape']['familySubtype'] = str(json['functionalDescription']['shape']['familySubtype'])
-
-        core = MagneticCore(**json)
-        core = core.dict()
-
-        core = clean_dimensions(core)
-        if not isinstance(core['functionalDescription']['material'], str):
-            core['functionalDescription']['material'] = core['functionalDescription']['material']['name']
-
-        # pprint.pprint(core)
-        aux = {
-            "core": core,
-        }
-        hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
-        # print(hash_value)
-
-        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stl"):
-            print("Core stl Hit!")
-            with open(f"{temp_folder}/cores/{hash_value}_core.stl", "rb") as stl:
-                stl_data = stl.read()
-                json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
-                return json_compatible_item_data
-
-        step_path, stl_path = ShapeBuilder("FreeCAD").get_core(project_name=hash_value,
-                                                               geometrical_description=core['geometricalDescription'],
-                                                               output_path=f"{temp_folder}/cores")
-        if stl_path is None and number_tries > 0:
-            number_tries -= 1
-            continue
-
-        break
-
-    if stl_path is None:
+    if stl_data is None:
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        with open(stl_path, "rb") as stl:
-            stl_data = stl.read()
-            json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
-            return json_compatible_item_data
+        json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+        return json_compatible_item_data
 
 
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
@@ -336,157 +274,52 @@ async def process_latex(request: Request):
 async def plot_core_and_fields(request: Request):
     data = await request.json()
 
-    aux = {
-        "magnetic": data["magnetic"],
-        "operatingPoint": data["operatingPoint"],
-        "includeFringing": data["includeFringing"],
-    }
-    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    result = task_plot_core_and_fields.delay(data, temp_folder)
+    plot = result.get(timeout=60)
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Hit!")
-        return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    if plot is None:
+        raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    settings = PyMKF.get_settings()
-    settings["painterSimpleLitz"] = True
-    settings["painterAdvancedLitz"] = False
-    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
-    settings["painterIncludeFringing"] = data["includeFringing"]
-    settings["painterColorBobbin"] = "0x7F539796"
-    settings["painterColorText"] = "0xd4d4d4"
-    settings["painterColorLines"] = "0x1a1a1a"
-    settings["painterColorMargin"] = "0x7Ffff05b"
-    PyMKF.set_settings(settings)
-    result = PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
-    print(result)
-    timeout = 0
-    current_size = 0
-    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
-        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
-        time.sleep(0.01)
-        timeout += 1
-        print(timeout)
-        if timeout == 1000:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    return FileResponse(plot)
 
 
 @app.post("/plot_core", include_in_schema=True)
 async def plot_core(request: Request):
     data = await request.json()
-    aux = {
-        "magnetic": data["magnetic"]
-    }
-    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Plot core Hit!")
-        print(hash_value)
-        return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    result = task_plot_core.delay(data, temp_folder)
+    plot = result.get(timeout=60)
 
-    settings = PyMKF.get_settings()
-    settings["painterSimpleLitz"] = True
-    settings["painterAdvancedLitz"] = False
-    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
-    PyMKF.set_settings(settings)
-    PyMKF.plot_turns(data["magnetic"], f"{temp_folder}/{hash_value}.svg")
+    if plot is None:
+        raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    timeout = 0
-    current_size = 0
-    while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        time.sleep(0.01)
-        timeout += 1
-        if timeout == 200:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    timeout = 0
-    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
-        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
-        time.sleep(0.01)
-        timeout += 1
-        if timeout == 1000:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    return FileResponse(plot)
 
 
 @app.post("/plot_wire", include_in_schema=True)
 async def plot_wire(request: Request):
     data = await request.json()
-    aux = {
-        "wire": data["wire"]
-    }
 
-    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    result = task_plot_wire.delay(data, temp_folder)
+    plot = result.get(timeout=60)
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Hit!")
-        return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    if plot is None:
+        raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    settings = PyMKF.get_settings()
-    settings["painterSimpleLitz"] = False
-    settings["painterAdvancedLitz"] = False
-    settings["painterColorBobbin"] = "0x539796"
-    settings["painterColorMargin"] = "0xfff05b"
-    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
-    PyMKF.set_settings(settings)
-
-    # print(data["wire"])
-    PyMKF.plot_wire(data["wire"], f"{temp_folder}/{hash_value}.svg", "/opt/openmagnetics/cci_coords/coordinates/")
-    timeout = 0
-    current_size = 0
-    while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        time.sleep(0.01)
-        timeout += 1
-        if timeout == 200:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    timeout = 0
-    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
-        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
-        time.sleep(0.01)
-        timeout += 1
-        if timeout == 1000:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    return FileResponse(plot)
 
 
 @app.post("/plot_wire_and_current_density", include_in_schema=True)
 async def plot_wire_and_current_density(request: Request):
     data = await request.json()
-    aux = {
-        "wire": data["wire"],
-        "operatingPoint": data["operatingPoint"],
-    }
 
-    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    result = task_plot_wire_and_current_density.delay(data, temp_folder)
+    plot = result.get(timeout=60)
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Hit!")
-        return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    if plot is None:
+        raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    settings = PyMKF.get_settings()
-    settings["painterSimpleLitz"] = False
-    settings["painterAdvancedLitz"] = False
-    settings["painterCciCoordinatesPath"] = "/opt/openmagnetics/cci_coords/coordinates/"
-    PyMKF.set_settings(settings)
-
-    PyMKF.plot_current_density(data["wire"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
-    timeout = 0
-    current_size = 0
-    while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        time.sleep(0.01)
-        timeout += 1
-        if timeout == 200:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    timeout = 0
-    while os.stat(f"{temp_folder}/{hash_value}.svg").st_size == 0 or current_size != os.stat(f"{temp_folder}/{hash_value}.svg").st_size:
-        current_size = os.stat(f"{temp_folder}/{hash_value}.svg").st_size
-        time.sleep(0.01)
-        timeout += 1
-        if timeout == 1000:
-            raise HTTPException(status_code=418, detail="Plotting timed out")
-    return FileResponse(f"{temp_folder}/{hash_value}.svg")
+    return FileResponse(plot)
 
 
 def insert_mas_background(data):
@@ -550,3 +383,12 @@ async def store_request(request: Request, background_tasks: BackgroundTasks):
     print(requests)
 
     requests.to_csv(file)
+
+
+@app.post("/read_core_material_by_name", include_in_schema=False)
+async def read_core_material_by_name(request: Request):
+    dataJson = await request.json()
+    core_materials_table = CoreMaterialsTable()
+    core_material_data = core_materials_table.read_material_by_name(dataJson["name"])
+
+    return core_material_data

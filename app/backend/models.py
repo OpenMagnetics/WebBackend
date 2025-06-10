@@ -150,11 +150,11 @@ class NotificationsTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"
-        address = os.getenv('OM_USERS_DB_ADDRESS')
-        port = os.getenv('OM_USERS_DB_PORT')
-        name = os.getenv('OM_USERS_DB_NAME')
-        user = os.getenv('OM_USERS_DB_USER')
-        password = os.getenv('OM_USERS_DB_PASSWORD')
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
 
         self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
 
@@ -311,259 +311,13 @@ class BugReportsTable(Database):
         return bug_report_id
 
 
-class RoadmapVotesTable(Database):
-    def connect(self, schema='public'):
-        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
-        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
-        
-        Base = declarative_base()
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
-
-        metadata = MetaData()
-        Table(
-            'milestone_voting', metadata, 
-            Column('id', Integer, primary_key=True), 
-            Column('ip_address', String), 
-            Column('user_id', Integer),
-            Column('milestone_id', Integer),
-        )
-
-        metadata.create_all(self.engine)
-        Base = automap_base(metadata=metadata)
-        Base.prepare()
-
-        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
-        self.session = Session()
-        self.Table = Base.classes.milestone_voting
-
-    def is_vote_casted(self, ip_address, milestone_id):
-        self.connect()
-        query = self.session.query(self.Table.milestone_id).filter(self.Table.milestone_id == milestone_id)
-        query = query.filter(self.Table.ip_address == ip_address)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return not data.empty
-
-    def are_vote_casted(self, ip_address, milestone_id=None):
-        self.connect()
-        if milestone_id is None:
-            query = self.session.query(self.Table.milestone_id)
-        else:
-            query = self.session.query(self.Table.milestone_id).filter(self.Table.milestone_id == milestone_id)
-
-        query = query.filter(self.Table.ip_address == ip_address)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return data
-
-    def get_number_votes(self, milestone_id):
-        self.connect()
-        query = self.session.query(sqlalchemy.func.count()).filter(self.Table.milestone_id == milestone_id)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return 0 if data.empty else int(data.values[0][0])
-
-    def get_all_number_votes(self):
-        self.connect()
-        query = self.session.query(self.Table.milestone_id, sqlalchemy.func.count(self.Table.milestone_id).label("count"))
-        query = query.group_by(self.Table.milestone_id).order_by(sqlalchemy.desc("count"))
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return data
-
-    def insert_vote(self, ip_address, milestone_id):
-        self.connect()
-        data = {
-            'ip_address': ip_address,
-            'user_id': None,
-            'milestone_id': milestone_id
-        }
-        row = self.Table(**data)
-        self.session.add(row)
-        self.session.flush()
-        self.session.commit()
-        query = self.session.query(self.Table)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        print(data)
-        self.disconnect()
-        return True
-
-
-class SlugsTable(Database):
-    def connect(self, schema='public'):
-        raise NotImplementedError
-
-    def slug_exists(self, slug):
-        self.connect()
-        query = self.session.query(self.Table.slug).filter(self.Table.slug == slug)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return not data.empty
-
-    def get_slug_username(self, slug):
-        self.connect()
-        query = self.session.query(self.Table.username).filter(self.Table.slug == slug)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return 0 if data.empty else data.values[0][0]
-
-    def get_all_slugs(self):
-        self.connect()
-        query = self.session.query(self.Table)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return 0 if data.empty else data
-
-    def insert_slug(self, slug, username):
-        self.connect()
-        data = {
-            'slug': slug,
-            'username': username
-        }
-        row = self.Table(**data)
-        self.session.add(row)
-        self.session.flush()
-        self.session.commit()
-        query = self.session.query(self.Table)
-        data = pandas.read_sql(query.statement, query.session.bind)
-        self.disconnect()
-        return True
-
-    def delete_slug(self, slug):
-        self.connect()
-        self.session.query(self.Table).filter(self.Table.slug == slug).delete()
-        self.session.commit()
-        self.disconnect()
-        return True
-
-
-class OperationPointSlugsTable(SlugsTable):
-    def connect(self, schema='public'):
-        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
-        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
-        
-        Base = declarative_base()
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
-
-        metadata = MetaData()
-        Table(
-            'operation_point_slugs', metadata, 
-            Column('slug', String, primary_key=True), 
-            Column('username', Integer)
-        )
-
-        metadata.create_all(self.engine)
-        Base = automap_base(metadata=metadata)
-        Base.prepare()
-
-        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
-        self.session = Session()
-        self.Table = Base.classes.operation_point_slugs
-
-
-class CoreSlugsTable(SlugsTable):
-    def connect(self, schema='public'):
-        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
-        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
-        
-        Base = declarative_base()
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
-
-        metadata = MetaData()
-        Table(
-            'core_slugs', metadata, 
-            Column('slug', String, primary_key=True), 
-            Column('username', Integer)
-        )
-
-        metadata.create_all(self.engine)
-        Base = automap_base(metadata=metadata)
-        Base.prepare()
-
-        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
-        self.session = Session()
-        self.Table = Base.classes.core_slugs
-
-
-class BobbinSlugsTable(SlugsTable):
-    def connect(self, schema='public'):
-        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
-        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
-        
-        Base = declarative_base()
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
-
-        metadata = MetaData()
-        Table(
-            'bobbin_slugs', metadata, 
-            Column('slug', String, primary_key=True), 
-            Column('username', Integer)
-        )
-
-        metadata.create_all(self.engine)
-        Base = automap_base(metadata=metadata)
-        Base.prepare()
-
-        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
-        self.session = Session()
-        self.Table = Base.classes.bobbin_slugs
-
-
-class WireSlugsTable(SlugsTable):
-    def connect(self, schema='public'):
-        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
-        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
-        
-        Base = declarative_base()
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
-
-        metadata = MetaData()
-        Table(
-            'wire_slugs', metadata, 
-            Column('slug', String, primary_key=True), 
-            Column('username', Integer)
-        )
-
-        metadata.create_all(self.engine)
-        Base = automap_base(metadata=metadata)
-        Base.prepare()
-
-        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
-        self.session = Session()
-        self.Table = Base.classes.wire_slugs
-
-
-class MagneticSlugsTable(SlugsTable):
-    def connect(self, schema='public'):
-        path = os.path.join(os.getenv('LOCAL_DB_PATH'), os.getenv('LOCAL_DB_FILENAME'))
-        os.makedirs(os.getenv('LOCAL_DB_PATH'), exist_ok=True)
-        
-        Base = declarative_base()
-        self.engine = sqlalchemy.create_engine(f'sqlite:///{path}')
-
-        metadata = MetaData()
-        Table(
-            'magnetic_slugs', metadata, 
-            Column('slug', String, primary_key=True), 
-            Column('username', Integer)
-        )
-
-        metadata.create_all(self.engine)
-        Base = automap_base(metadata=metadata)
-        Base.prepare()
-
-        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
-        self.session = Session()
-        self.Table = Base.classes.magnetic_slugs
-
-
 class DataTable(Database):
 
     def connect(self, schema='public'):
-        driver = os.getenv('OM_OPERATION_POINTS_DB_DRIVER')
-        address = os.getenv('OM_OPERATION_POINTS_DB_ADDRESS')
-        user = os.getenv('OM_OPERATION_POINTS_DB_USER')
-        password = os.getenv('OM_OPERATION_POINTS_DB_PASSWORD')
+        driver = os.getenv('OM_DB_DRIVER')
+        address = os.getenv('OM_DB_ADDRESS')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
 
         self.session = MongoClient(f"{driver}://{user}:{password}@{address}/")
 
@@ -638,31 +392,6 @@ class DataTable(Database):
                 "id": id}
 
 
-class OperationPointsTable(DataTable):
-    def get_table(self):
-        return self.session.OperationPoints
-
-
-class CoresTable(DataTable):
-    def get_table(self):
-        return self.session.Cores
-
-
-class BobbinsTable(DataTable):
-    def get_table(self):
-        return self.session.Bobbins
-
-
-class WiresTable(DataTable):
-    def get_table(self):
-        return self.session.Wires
-
-
-class MagneticsTable(DataTable):
-    def get_table(self):
-        return self.session.Magnetics
-
-
 class MasTable(Database):
 
     def connect(self, schema='public'):
@@ -733,3 +462,32 @@ class IntermediateMasTable(Database):
         self.session.commit()
         self.disconnect()
         return mas_id
+
+
+class CoreMaterialsTable(Database):
+
+    def connect(self, schema='public'):
+        driver = "postgresql"
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
+
+        self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
+
+        metadata = sqlalchemy.MetaData()
+        metadata.reflect(self.engine, schema=schema)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.advanced_core_materials
+
+    def read_material_by_name(self, material_name):
+        self.connect()
+        query = self.session.query(self.Table).filter(self.Table.name == material_name)
+        data = pandas.read_sql(query.statement, query.session.bind)
+        self.disconnect()
+        return data.to_dict('records')[0]
