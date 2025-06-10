@@ -7,8 +7,8 @@ import time
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from mas_models import MagneticCore, CoreShape
 from celery import Celery
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../MVB/src/OpenMagneticsVirtualBuilder')))
-from builder import Builder as ShapeBuilder  # noqa: E402
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../MVB/src/OpenMagneticsVirtualBuilder')))
+from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
 
 app = Celery('plots', backend='rpc://', broker='pyamqp://guest@localhost//')
 
