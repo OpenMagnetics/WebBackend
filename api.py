@@ -18,10 +18,10 @@ import time
 from pylatex import Document, Command, Package
 from pylatex.utils import NoEscape
 import PyMKF
-# from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
+from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
 import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MVB/src/OpenMagneticsVirtualBuilder')))
-from builder import Builder as ShapeBuilder  # noqa: E402
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MVB/src/OpenMagneticsVirtualBuilder')))
+# from builder import Builder as ShapeBuilder  # noqa: E402
 import hashlib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'app/backend')))
 from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
