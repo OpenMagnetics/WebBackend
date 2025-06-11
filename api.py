@@ -26,6 +26,7 @@ import hashlib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'app/backend')))
 from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
 from plotter import task_generate_core_technical_drawing, task_generate_gapping_technical_drawing
+import subprocess
 
 temp_folder = "/opt/openmagnetics/temp"
 
@@ -123,6 +124,7 @@ def core_compute_shape(coreShape: CoreShape):
     core_builder.set_output_path(temp_folder)    
     step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(stl_path)
@@ -135,6 +137,7 @@ def core_compute_shape_stp(coreShape: CoreShape):
     core_builder.set_output_path(temp_folder)    
     step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(step_path)
@@ -144,7 +147,7 @@ def core_compute_shape_stp(coreShape: CoreShape):
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
     core = await request.json()
-    number_retries = 5
+    number_retri2s = 5
 
     for retry in range(number_retries):
         result = task_generate_core_3d_model.delay(core, temp_folder)
@@ -154,6 +157,7 @@ async def core_compute_core_3d_model(request: Request):
         print("Retrying task_generate_core_3d_model")
 
     if stl_data is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
@@ -163,7 +167,7 @@ async def core_compute_core_3d_model(request: Request):
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
 async def core_compute_core_3d_model_stp(request: Request):
     core = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_generate_core_3d_model.delay(core, temp_folder, False)
@@ -173,6 +177,7 @@ async def core_compute_core_3d_model_stp(request: Request):
         print("Retrying task_generate_core_3d_model")
 
     if stl_data is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
@@ -182,7 +187,7 @@ async def core_compute_core_3d_model_stp(request: Request):
 @app.post("/core_compute_technical_drawing", include_in_schema=False)
 async def core_compute_technical_drawing(request: Request):
     data = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_generate_core_technical_drawing.delay(data, temp_folder)
@@ -192,6 +197,7 @@ async def core_compute_technical_drawing(request: Request):
         print("Retrying task_generate_core_technical_drawing")
 
     if views is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
@@ -200,7 +206,7 @@ async def core_compute_technical_drawing(request: Request):
 @app.post("/core_compute_gapping_technical_drawing", include_in_schema=False)
 async def core_compute_gapping_technical_drawing(request: Request):
     data = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_generate_gapping_technical_drawing.delay(data, temp_folder)
@@ -210,6 +216,7 @@ async def core_compute_gapping_technical_drawing(request: Request):
         print("Retrying task_generate_gapping_technical_drawing")
 
     if views is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
@@ -250,7 +257,7 @@ async def process_latex(request: Request):
 @app.post("/plot_core_and_fields", include_in_schema=True)
 async def plot_core_and_fields(request: Request):
     data = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_plot_core_and_fields.delay(data, temp_folder)
@@ -260,6 +267,7 @@ async def plot_core_and_fields(request: Request):
         print("Retrying plot_core_and_fields")
 
     if plot is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
     return FileResponse(plot)
@@ -268,7 +276,7 @@ async def plot_core_and_fields(request: Request):
 @app.post("/plot_core", include_in_schema=True)
 async def plot_core(request: Request):
     data = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_plot_core.delay(data, temp_folder)
@@ -278,6 +286,7 @@ async def plot_core(request: Request):
         print("Retrying task_plot_core")
 
     if plot is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
     return FileResponse(plot)
@@ -286,7 +295,7 @@ async def plot_core(request: Request):
 @app.post("/plot_wire", include_in_schema=True)
 async def plot_wire(request: Request):
     data = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_plot_wire.delay(data, temp_folder)
@@ -296,6 +305,7 @@ async def plot_wire(request: Request):
         print("Retrying task_plot_wire")
 
     if plot is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
     return FileResponse(plot)
@@ -304,7 +314,7 @@ async def plot_wire(request: Request):
 @app.post("/plot_wire_and_current_density", include_in_schema=True)
 async def plot_wire_and_current_density(request: Request):
     data = await request.json()
-    number_retries = 5
+    number_retries = 2
 
     for retry in range(number_retries):
         result = task_plot_wire_and_current_density.delay(data, temp_folder)
@@ -314,6 +324,7 @@ async def plot_wire_and_current_density(request: Request):
         print("Retrying task_plot_wire_and_current_density")
 
     if plot is None:
+        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
     return FileResponse(plot)
