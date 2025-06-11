@@ -15,6 +15,7 @@ import os
 import pathlib
 import base64
 import time
+import celery
 from pylatex import Document, Command, Package
 from pylatex.utils import NoEscape
 import PyMKF
@@ -147,11 +148,17 @@ def core_compute_shape_stp(coreShape: CoreShape):
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
     core = await request.json()
-    number_retri2s = 5
+    number_retries = 5
+    stl_data = None
 
     for retry in range(number_retries):
         result = task_generate_core_3d_model.delay(core, temp_folder)
-        stl_data = result.get(timeout=10)
+        try:
+            stl_data = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if stl_data is not None:
             break
         print("Retrying task_generate_core_3d_model")
@@ -167,31 +174,43 @@ async def core_compute_core_3d_model(request: Request):
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
 async def core_compute_core_3d_model_stp(request: Request):
     core = await request.json()
-    number_retries = 2
+    number_retries = 5
+    stp_data = None
 
     for retry in range(number_retries):
         result = task_generate_core_3d_model.delay(core, temp_folder, False)
-        stl_data = result.get(timeout=10)
-        if stl_data is not None:
+        try:
+            stp_data = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
+        if stp_data is not None:
             break
         print("Retrying task_generate_core_3d_model")
 
-    if stl_data is None:
+    if stp_data is None:
         subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+        json_compatible_item_data = jsonable_encoder(stp_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
         return json_compatible_item_data
 
 
 @app.post("/core_compute_technical_drawing", include_in_schema=False)
 async def core_compute_technical_drawing(request: Request):
     data = await request.json()
-    number_retries = 2
+    number_retries = 5
+    views = None
 
     for retry in range(number_retries):
         result = task_generate_core_technical_drawing.delay(data, temp_folder)
-        views = result.get(timeout=10)
+        try:
+            views = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if views is not None:
             break
         print("Retrying task_generate_core_technical_drawing")
@@ -206,11 +225,17 @@ async def core_compute_technical_drawing(request: Request):
 @app.post("/core_compute_gapping_technical_drawing", include_in_schema=False)
 async def core_compute_gapping_technical_drawing(request: Request):
     data = await request.json()
-    number_retries = 2
+    number_retries = 5
+    views = None
 
     for retry in range(number_retries):
         result = task_generate_gapping_technical_drawing.delay(data, temp_folder)
-        views = result.get(timeout=10)
+        try:
+            views = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if views is not None:
             break
         print("Retrying task_generate_gapping_technical_drawing")
@@ -257,11 +282,17 @@ async def process_latex(request: Request):
 @app.post("/plot_core_and_fields", include_in_schema=True)
 async def plot_core_and_fields(request: Request):
     data = await request.json()
-    number_retries = 2
+    number_retries = 5
+    plot = None
 
     for retry in range(number_retries):
         result = task_plot_core_and_fields.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if plot is not None:
             break
         print("Retrying plot_core_and_fields")
@@ -276,11 +307,17 @@ async def plot_core_and_fields(request: Request):
 @app.post("/plot_core", include_in_schema=True)
 async def plot_core(request: Request):
     data = await request.json()
-    number_retries = 2
+    number_retries = 5
+    plot = None
 
     for retry in range(number_retries):
         result = task_plot_core.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_core")
@@ -295,11 +332,17 @@ async def plot_core(request: Request):
 @app.post("/plot_wire", include_in_schema=True)
 async def plot_wire(request: Request):
     data = await request.json()
-    number_retries = 2
+    number_retries = 5
+    plot = None
 
     for retry in range(number_retries):
         result = task_plot_wire.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_wire")
@@ -314,11 +357,17 @@ async def plot_wire(request: Request):
 @app.post("/plot_wire_and_current_density", include_in_schema=True)
 async def plot_wire_and_current_density(request: Request):
     data = await request.json()
-    number_retries = 2
+    number_retries = 5
+    plot = None
 
     for retry in range(number_retries):
         result = task_plot_wire_and_current_density.delay(data, temp_folder)
-        plot = result.get(timeout=10)
+        try:
+            plot = result.get(timeout=10)
+        except celery.exceptions.TimeoutError:
+            continue
+        except ConnectionResetError:
+            continue
         if plot is not None:
             break
         print("Retrying task_plot_wire_and_current_density")
