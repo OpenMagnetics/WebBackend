@@ -173,7 +173,7 @@ async def core_compute_core_3d_model(request: Request):
     else:
         # json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
         # return json_compatible_item_data
-        return stp_data
+        return stl_data
 
 
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
