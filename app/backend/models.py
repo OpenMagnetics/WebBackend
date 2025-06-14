@@ -12,7 +12,8 @@ from enum import Enum
 from pymongo import MongoClient
 from bson import ObjectId, json_util
 import json
-
+from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.orm.exc import MultipleResultsFound
 
 class Harmonics(BaseModel):
     """Data containing the harmonics of the waveform, defined by a list of amplitudes and a list
@@ -491,3 +492,54 @@ class CoreMaterialsTable(Database):
         data = pandas.read_sql(query.statement, query.session.bind)
         self.disconnect()
         return data.to_dict('records')[0]
+
+
+class PlotCacheTable(Database):
+    def connect(self):
+        self.engine = sqlalchemy.create_engine("sqlite:////opt/openmagnetics/cache.db", isolation_level="AUTOCOMMIT")
+
+        Base = declarative_base()
+
+        class PlotCache(Base):
+            __tablename__ = 'plot_cache'
+            hash = Column(String, primary_key=True)
+            data = Column(String)
+            created_at = Column(String)
+
+        # Create all tables in the engine
+        Base.metadata.create_all(self.engine)
+
+        metadata = sqlalchemy.MetaData()
+        metadata.reflect(self.engine, )
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.plot_cache
+
+    def insert_plot(self, hash, data):
+        self.connect()
+        data = {
+            'hash': hash,
+            'data': data,
+            'created_at': datetime.datetime.now(),
+        }
+        row = self.Table(**data)
+        self.session.add(row)
+        self.session.flush()
+        self.session.commit()
+        self.disconnect()
+        return True
+
+    def read_plot(self, hash):
+        self.connect()
+        query = self.session.query(self.Table).filter(self.Table.hash == hash)
+        try:
+            data = query.one().data
+        except MultipleResultsFound:
+            data = None
+        except NoResultFound:
+            data = None
+        self.disconnect()
+        return data

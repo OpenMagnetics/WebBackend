@@ -14,7 +14,7 @@ import copy
 import os
 import pathlib
 import base64
-import time
+import kombu
 import celery
 from pylatex import Document, Command, Package
 from pylatex.utils import NoEscape
@@ -151,24 +151,29 @@ async def core_compute_core_3d_model(request: Request):
     number_retries = 5
     stl_data = None
 
-    for retry in range(number_retries):
-        result = task_generate_core_3d_model.delay(core, temp_folder)
-        try:
-            stl_data = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if stl_data is not None:
-            break
-        print("Retrying task_generate_core_3d_model")
+    try:
+        for retry in range(number_retries):
+            result = task_generate_core_3d_model.delay(core, temp_folder)
+            try:
+                stl_data = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if stl_data is not None:
+                break
+            print("Retrying task_generate_core_3d_model")
+        if stl_data is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        stl_data = task_generate_core_3d_model(core, temp_folder)
 
     if stl_data is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
-        return json_compatible_item_data
+        # json_compatible_item_data = jsonable_encoder(stl_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+        # return json_compatible_item_data
+        return stp_data
 
 
 @app.post("/core_compute_core_3d_model_stp", include_in_schema=False)
@@ -177,24 +182,29 @@ async def core_compute_core_3d_model_stp(request: Request):
     number_retries = 5
     stp_data = None
 
-    for retry in range(number_retries):
-        result = task_generate_core_3d_model.delay(core, temp_folder, False)
-        try:
-            stp_data = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if stp_data is not None:
-            break
-        print("Retrying task_generate_core_3d_model")
+    try:
+        for retry in range(number_retries):
+            result = task_generate_core_3d_model.delay(core, temp_folder, False)
+            try:
+                stp_data = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if stp_data is not None:
+                break
+            print("Retrying task_generate_core_3d_model")
+        if stp_data is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        stp_data = task_generate_core_3d_model(core, temp_folder, False)
 
     if stp_data is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
-        json_compatible_item_data = jsonable_encoder(stp_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
-        return json_compatible_item_data
+        # json_compatible_item_data = jsonable_encoder(stp_data, custom_encoder={bytes: lambda v: base64.b64encode(v).decode('utf-8')})
+        # return json_compatible_item_data
+        return stp_data
 
 
 @app.post("/core_compute_technical_drawing", include_in_schema=False)
@@ -203,20 +213,24 @@ async def core_compute_technical_drawing(request: Request):
     number_retries = 5
     views = None
 
-    for retry in range(number_retries):
-        result = task_generate_core_technical_drawing.delay(data, temp_folder)
-        try:
-            views = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if views is not None:
-            break
-        print("Retrying task_generate_core_technical_drawing")
+    try:
+        for retry in range(number_retries):
+            result = task_generate_core_technical_drawing.delay(data, temp_folder)
+            try:
+                views = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if views is not None:
+                break
+            print("Retrying task_generate_core_technical_drawing")
+        if views is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        views = task_generate_core_technical_drawing(data, temp_folder)
 
     if views is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
@@ -228,20 +242,24 @@ async def core_compute_gapping_technical_drawing(request: Request):
     number_retries = 5
     views = None
 
-    for retry in range(number_retries):
-        result = task_generate_gapping_technical_drawing.delay(data, temp_folder)
-        try:
-            views = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if views is not None:
-            break
-        print("Retrying task_generate_gapping_technical_drawing")
+    try:
+        for retry in range(number_retries):
+            result = task_generate_gapping_technical_drawing.delay(data, temp_folder)
+            try:
+                views = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if views is not None:
+                break
+            print("Retrying task_generate_gapping_technical_drawing")
+        if views is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        views = task_generate_core_technical_drawing(data, temp_folder)
 
     if views is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return views
@@ -285,23 +303,30 @@ async def plot_core_and_fields(request: Request):
     number_retries = 5
     plot = None
 
-    for retry in range(number_retries):
-        result = task_plot_core_and_fields.delay(data, temp_folder)
-        try:
-            plot = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if plot is not None:
-            break
-        print("Retrying plot_core_and_fields")
+    try:
+        for retry in range(number_retries):
+            result = task_plot_core_and_fields.delay(data, temp_folder)
+            try:
+                plot = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if plot is not None:
+                break
+            print("Retrying plot_core_and_fields")
+        if plot is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        plot = task_plot_core_and_fields(data, temp_folder)
 
     if plot is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    return FileResponse(plot)
+    if plot.endswith(".svg"):
+        return FileResponse(plot)
+    else:
+        return plot
 
 
 @app.post("/plot_core", include_in_schema=True)
@@ -310,23 +335,30 @@ async def plot_core(request: Request):
     number_retries = 5
     plot = None
 
-    for retry in range(number_retries):
-        result = task_plot_core.delay(data, temp_folder)
-        try:
-            plot = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if plot is not None:
-            break
-        print("Retrying task_plot_core")
+    try:
+        for retry in range(number_retries):
+            result = task_plot_core.delay(data, temp_folder)
+            try:
+                plot = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if plot is not None:
+                break
+            print("Retrying task_plot_core")
+        if plot is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        plot = task_plot_core(data, temp_folder)
 
     if plot is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    return FileResponse(plot)
+    if plot.endswith(".svg"):
+        return FileResponse(plot)
+    else:
+        return plot
 
 
 @app.post("/plot_wire", include_in_schema=True)
@@ -335,23 +367,30 @@ async def plot_wire(request: Request):
     number_retries = 5
     plot = None
 
-    for retry in range(number_retries):
-        result = task_plot_wire.delay(data, temp_folder)
-        try:
-            plot = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if plot is not None:
-            break
-        print("Retrying task_plot_wire")
+    try:
+        for retry in range(number_retries):
+            result = task_plot_wire.delay(data, temp_folder)
+            try:
+                plot = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if plot is not None:
+                break
+            print("Retrying task_plot_wire")
+        if plot is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        plot = task_plot_wire(data, temp_folder)
 
     if plot is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    return FileResponse(plot)
+    if plot.endswith(".svg"):
+        return FileResponse(plot)
+    else:
+        return plot
 
 
 @app.post("/plot_wire_and_current_density", include_in_schema=True)
@@ -360,23 +399,30 @@ async def plot_wire_and_current_density(request: Request):
     number_retries = 5
     plot = None
 
-    for retry in range(number_retries):
-        result = task_plot_wire_and_current_density.delay(data, temp_folder)
-        try:
-            plot = result.get(timeout=10)
-        except celery.exceptions.TimeoutError:
-            continue
-        except ConnectionResetError:
-            continue
-        if plot is not None:
-            break
-        print("Retrying task_plot_wire_and_current_density")
+    try:
+        for retry in range(number_retries):
+            result = task_plot_wire_and_current_density.delay(data, temp_folder)
+            try:
+                plot = result.get(timeout=10)
+            except celery.exceptions.TimeoutError:
+                continue
+            except ConnectionResetError:
+                continue
+            if plot is not None:
+                break
+            print("Retrying task_plot_wire_and_current_density")
+        if plot is None:
+            subprocess.run(["pkill", "python3"]) 
+    except kombu.exceptions.OperationalError:
+        plot = task_plot_wire_and_current_density(data, temp_folder)
 
     if plot is None:
-        subprocess.run(["pkill", "python3"]) 
         raise HTTPException(status_code=418, detail="Plotting timed out")
 
-    return FileResponse(plot)
+    if plot.endswith(".svg"):
+        return FileResponse(plot)
+    else:
+        return plot
 
 
 def insert_mas_background(data):

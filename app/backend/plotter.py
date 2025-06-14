@@ -4,11 +4,14 @@ import os
 import hashlib
 import PyMKF
 import time
+import ast
+import base64
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from mas_models import MagneticCore, CoreShape
 from celery import Celery
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../MVB/src/OpenMagneticsVirtualBuilder')))
 from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
+from models import PlotCacheTable
 
 app = Celery('plots', backend='rpc://', broker='pyamqp://guest@localhost//')
 
@@ -45,20 +48,12 @@ def task_generate_core_3d_model(core, temp_folder, stl_or_not_step=True):
         "core": core,
     }
     hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
-    # print(hash_value)
+    cache = PlotCacheTable()
 
-    if stl_or_not_step:
-        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stl"):
-            print("Core stl Hit!")
-            with open(f"{temp_folder}/cores/{hash_value}_core.stl", "rb") as stl:
-                stl_data = stl.read()
-                return stl_data
-    else:
-        if os.path.exists(f"{temp_folder}/cores/{hash_value}_core.stp"):
-            print("Core stp Hit!")
-            with open(f"{temp_folder}/cores/{hash_value}_core.stp", "rb") as stp:
-                stp_data = stp.read()
-                return stp_data
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return cached_datum
 
     step_path, stl_path = ShapeBuilder("FreeCAD").get_core(project_name=hash_value,
                                                            geometrical_description=core['geometricalDescription'],
@@ -71,6 +66,8 @@ def task_generate_core_3d_model(core, temp_folder, stl_or_not_step=True):
 
     with open(path, "rb") as stl:
         data = stl.read()
+        data = base64.b64encode(data).decode('utf-8')
+        cache.insert_plot(hash_value, data)
         return data
 
 
@@ -82,10 +79,12 @@ def task_plot_core_and_fields(data, temp_folder):
         "includeFringing": data["includeFringing"],
     }
     hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    cache = PlotCacheTable()
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Hit!")
-        return f"{temp_folder}/{hash_value}.svg"
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return cached_datum
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = True
@@ -98,8 +97,7 @@ def task_plot_core_and_fields(data, temp_folder):
     settings["painterColorMargin"] = "0x7Ffff05b"
     PyMKF.set_settings(settings)
     result = PyMKF.plot_field(data["magnetic"], data["operatingPoint"], f"{temp_folder}/{hash_value}.svg")
-    print("result")
-    print(result)
+
     timeout = 0
     current_size = 0
     while not os.path.exists(f"{temp_folder}/{hash_value}.svg"):
@@ -116,6 +114,10 @@ def task_plot_core_and_fields(data, temp_folder):
         print(timeout)
         if timeout == 1000:
             return None
+
+    with open(f"{temp_folder}/{hash_value}.svg", "rb") as svg:
+        cache.insert_plot(hash_value, svg.read().decode("utf-8"))
+
     return f"{temp_folder}/{hash_value}.svg"
 
 
@@ -125,11 +127,12 @@ def task_plot_core(data, temp_folder):
         "magnetic": data["magnetic"]
     }
     hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    cache = PlotCacheTable()
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Plot core Hit!")
-        print(hash_value)
-        return f"{temp_folder}/{hash_value}.svg"
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return cached_datum
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = True
@@ -153,6 +156,10 @@ def task_plot_core(data, temp_folder):
         timeout += 1
         if timeout == 1000:
             return None
+
+    with open(f"{temp_folder}/{hash_value}.svg", "rb") as svg:
+        cache.insert_plot(hash_value, svg.read().decode("utf-8"))
+
     return f"{temp_folder}/{hash_value}.svg"
 
 
@@ -163,10 +170,12 @@ def task_plot_wire(data, temp_folder):
     }
 
     hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    cache = PlotCacheTable()
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Hit!")
-        return f"{temp_folder}/{hash_value}.svg"
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return cached_datum
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = False
@@ -193,6 +202,10 @@ def task_plot_wire(data, temp_folder):
         timeout += 1
         if timeout == 1000:
             return None
+
+    with open(f"{temp_folder}/{hash_value}.svg", "rb") as svg:
+        cache.insert_plot(hash_value, svg.read().decode("utf-8"))
+
     return f"{temp_folder}/{hash_value}.svg"
 
 
@@ -204,10 +217,12 @@ def task_plot_wire_and_current_density(data, temp_folder):
     }
 
     hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    cache = PlotCacheTable()
 
-    if os.path.exists(f"{temp_folder}/{hash_value}.svg"):
-        print("Hit!")
-        return f"{temp_folder}/{hash_value}.svg"
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return cached_datum
 
     settings = PyMKF.get_settings()
     settings["painterSimpleLitz"] = False
@@ -231,6 +246,10 @@ def task_plot_wire_and_current_density(data, temp_folder):
         timeout += 1
         if timeout == 1000:
             return None
+
+    with open(f"{temp_folder}/{hash_value}.svg", "rb") as svg:
+        cache.insert_plot(hash_value, svg.read().decode("utf-8"))
+
     return f"{temp_folder}/{hash_value}.svg"
 
 
@@ -240,8 +259,18 @@ def task_generate_core_technical_drawing(data, temp_folder):
         data['familySubtype'] = str(data['familySubtype'])
 
     coreShape = CoreShape(**data)
-
     coreShape = coreShape.dict()
+    aux = {
+        "coreShape": coreShape,
+    }
+    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    cache = PlotCacheTable()
+
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return ast.literal_eval(cached_datum)
+
     core_builder = ShapeBuilder("FreeCAD").factory(coreShape)
     core_builder.set_output_path(f"{temp_folder}/")
     colors = {
@@ -253,6 +282,7 @@ def task_generate_core_technical_drawing(data, temp_folder):
     if views['top_view'] is None or views['front_view'] is None:
         return None
     else:
+        cache.insert_plot(hash_value, str(views))
         return views
 
 
@@ -263,6 +293,16 @@ def task_generate_gapping_technical_drawing(data, temp_folder):
 
     core = MagneticCore(**data)
     core = core.dict()
+    aux = {
+        "core": core,
+    }
+    hash_value = hashlib.sha256(str(aux).encode()).hexdigest()
+    cache = PlotCacheTable()
+
+    cached_datum = cache.read_plot(hash_value)
+    if cached_datum is not None:
+        print("Hit in cache!")
+        return ast.literal_eval(cached_datum)
 
     colors = {
         "projection_color": "#d4d4d4",
@@ -277,4 +317,5 @@ def task_generate_gapping_technical_drawing(data, temp_folder):
     if views['top_view'] is None or views['front_view'] is None:
         return None
     else:
+        cache.insert_plot(hash_value, str(views))
         return views
