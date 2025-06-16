@@ -465,7 +465,7 @@ class IntermediateMasTable(Database):
         return mas_id
 
 
-class CoreMaterialsTable(Database):
+class AdvancedCoreMaterialsTable(Database):
 
     def connect(self, schema='public'):
         driver = "postgresql"

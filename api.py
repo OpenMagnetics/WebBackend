@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, CoreMaterialsTable
+from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, AdvancedCoreMaterialsTable
 from app.backend.models import BugReport
 from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
@@ -488,10 +488,10 @@ async def store_request(request: Request, background_tasks: BackgroundTasks):
     requests.to_csv(file)
 
 
-@app.post("/read_core_material_by_name", include_in_schema=False)
-async def read_core_material_by_name(request: Request):
+@app.post("/read_advanced_core_material_by_name", include_in_schema=False)
+async def read_advanced_core_material_by_name(request: Request):
     dataJson = await request.json()
-    core_materials_table = CoreMaterialsTable()
-    core_material_data = core_materials_table.read_material_by_name(dataJson["name"])
+    advanced_core_materials_table = AdvancedCoreMaterialsTable()
+    advanced_core_material_data = advanced_core_materials_table.read_material_by_name(dataJson["name"])
 
-    return core_material_data
+    return advanced_core_material_data
