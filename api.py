@@ -25,6 +25,7 @@ import sys
 # from builder import Builder as ShapeBuilder  # noqa: E402
 import hashlib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'app/backend')))
+from plotter import purge_queue
 from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
 from plotter import task_generate_core_technical_drawing, task_generate_gapping_technical_drawing
 import subprocess
@@ -125,7 +126,7 @@ def core_compute_shape(coreShape: CoreShape):
     core_builder.set_output_path(temp_folder)    
     step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
-        subprocess.run(["pkill", "python3"]) 
+        purge_queue()
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(stl_path)
@@ -138,7 +139,7 @@ def core_compute_shape_stp(coreShape: CoreShape):
     core_builder.set_output_path(temp_folder)    
     step_path, stl_path = core_builder.get_piece(coreShape)
     if step_path is None:
-        subprocess.run(["pkill", "python3"]) 
+        purge_queue()
         raise HTTPException(status_code=418, detail="Wrong dimensions")
     else:
         return FileResponse(step_path)
@@ -164,7 +165,7 @@ async def core_compute_core_3d_model(request: Request):
                 break
             print("Retrying task_generate_core_3d_model")
         if stl_data is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         stl_data = task_generate_core_3d_model(core, temp_folder)
 
@@ -195,7 +196,7 @@ async def core_compute_core_3d_model_stp(request: Request):
                 break
             print("Retrying task_generate_core_3d_model")
         if stp_data is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         stp_data = task_generate_core_3d_model(core, temp_folder, False)
 
@@ -226,7 +227,7 @@ async def core_compute_technical_drawing(request: Request):
                 break
             print("Retrying task_generate_core_technical_drawing")
         if views is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         views = task_generate_core_technical_drawing(data, temp_folder)
 
@@ -255,7 +256,7 @@ async def core_compute_gapping_technical_drawing(request: Request):
                 break
             print("Retrying task_generate_gapping_technical_drawing")
         if views is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         views = task_generate_core_technical_drawing(data, temp_folder)
 
@@ -316,7 +317,7 @@ async def plot_core_and_fields(request: Request):
                 break
             print("Retrying plot_core_and_fields")
         if plot is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         plot = task_plot_core_and_fields(data, temp_folder)
 
@@ -348,7 +349,7 @@ async def plot_core(request: Request):
                 break
             print("Retrying task_plot_core")
         if plot is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         plot = task_plot_core(data, temp_folder)
 
@@ -380,7 +381,7 @@ async def plot_wire(request: Request):
                 break
             print("Retrying task_plot_wire")
         if plot is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         plot = task_plot_wire(data, temp_folder)
 
@@ -412,7 +413,7 @@ async def plot_wire_and_current_density(request: Request):
                 break
             print("Retrying task_plot_wire_and_current_density")
         if plot is None:
-            subprocess.run(["pkill", "python3"]) 
+            purge_queue()
     except kombu.exceptions.OperationalError:
         plot = task_plot_wire_and_current_density(data, temp_folder)
 

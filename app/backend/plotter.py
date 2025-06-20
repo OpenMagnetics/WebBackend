@@ -16,6 +16,11 @@ from models import PlotCacheTable
 app = Celery('plots', backend='rpc://', broker='pyamqp://guest@localhost//')
 
 
+def purge_queue():
+    print("Purging queue")
+    app.control.purge()
+
+
 def clean_dimensions(core):
     # Make sure no unwanted dimension gets in
     families = ShapeBuilder("FreeCAD").get_families()
