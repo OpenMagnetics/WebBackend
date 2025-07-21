@@ -496,7 +496,7 @@ class AdvancedCoreMaterialsTable(Database):
 
 class PlotCacheTable(Database):
     def connect(self):
-        self.engine = sqlalchemy.create_engine("sqlite:////opt/openmagnetics/cache.db", isolation_level="AUTOCOMMIT")
+        self.engine = sqlalchemy.create_engine("sqlite:////cache/cache.db", isolation_level="AUTOCOMMIT")
 
         Base = declarative_base()
 
@@ -519,7 +519,10 @@ class PlotCacheTable(Database):
         self.Table = Base.classes.plot_cache
 
     def insert_plot(self, hash, data):
-        self.connect()
+        try:
+            self.connect()
+        except sqlalchemy.exc.OperationalError:
+            return False
         data = {
             'hash': hash,
             'data': data,
@@ -533,7 +536,10 @@ class PlotCacheTable(Database):
         return True
 
     def read_plot(self, hash):
-        self.connect()
+        try:
+            self.connect()
+        except sqlalchemy.exc.OperationalError:
+            return None
         query = self.session.query(self.Table).filter(self.Table.hash == hash)
         try:
             data = query.one().data
