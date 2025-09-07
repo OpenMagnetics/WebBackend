@@ -32,6 +32,7 @@ import ast
 
 temp_folder = "/opt/openmagnetics/temp"
 use_celery = ast.literal_eval(os.getenv('USE_CELERY', "True"))
+use_db = "OM_DB_ADDRESS" in os.environ
 
 
 def clean_dimensions(core):
@@ -472,10 +473,13 @@ def insert_intermediate_mas_background(data):
 
 @app.post("/insert_intermediate_mas", include_in_schema=False)
 async def insert_intermediate_mas(request: Request, background_tasks: BackgroundTasks):
-    data = await request.json()
-    background_tasks.add_task(insert_intermediate_mas_background, data)
+    if use_db:
+        data = await request.json()
+        background_tasks.add_task(insert_intermediate_mas_background, data)
 
-    return "Inserting in the background"
+        return "Inserting in the background"
+    else:
+        return "DB not available"
 
 
 @app.post("/load_external_core_materials", include_in_schema=False)
