@@ -29,8 +29,10 @@ from plotter import purge_queue
 from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
 from plotter import task_generate_core_technical_drawing, task_generate_gapping_technical_drawing
 import ast
+import httpx
 
 temp_folder = "/opt/openmagnetics/temp"
+high_performance_backend_url = "http://192.168.1.128:8001"
 use_celery = ast.literal_eval(os.getenv('USE_CELERY', "True"))
 use_db = "OM_DB_ADDRESS" in os.environ
 
@@ -526,3 +528,27 @@ async def read_advanced_core_material_by_name(request: Request):
     advanced_core_material_data = advanced_core_materials_table.read_material_by_name(dataJson["name"])
 
     return advanced_core_material_data
+
+
+@app.post("/create_simulation_from_mas", include_in_schema=False)
+async def create_simulation_from_mas(request: Request):
+    data = await request.json()
+    url = f'{high_performance_backend_url}/create_simulation_from_mas'
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=data, timeout=600)
+        # print(response.content)
+        print("len(response.content)")
+        print(len(response.content))
+        return Response(content=response.content, media_type="binary/octet-stream")
+
+
+@app.post("/is_high_performance_backend_available", include_in_schema=False)
+async def is_high_performance_backend_available():
+    try:
+        url = f'{high_performance_backend_url}/remote_available'
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, timeout=5)
+            print("Remote available")
+            return True
+    except Exception:
+        return False
