@@ -32,7 +32,7 @@ import ast
 import httpx
 
 temp_folder = "/opt/openmagnetics/temp"
-high_performance_backend_url = "http://192.168.1.128:8001"
+high_performance_backend_url = "http://86.127.248.99:8001"
 use_celery = ast.literal_eval(os.getenv('USE_CELERY', "True"))
 use_db = "OM_DB_ADDRESS" in os.environ
 
