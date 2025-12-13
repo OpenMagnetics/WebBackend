@@ -149,7 +149,7 @@ def core_compute_shape_stp(coreShape: CoreShape):
         return FileResponse(step_path)
 
 
-@app.post("/core_compute_core_3d_model_obj", include_in_schema=False)
+@app.post("/core_compute_core_3d_model_stl", include_in_schema=False)
 @app.post("/core_compute_core_3d_model", include_in_schema=False)
 async def core_compute_core_3d_model(request: Request):
     core = await request.json()

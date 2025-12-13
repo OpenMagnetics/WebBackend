@@ -15,6 +15,7 @@ import json
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.exc import MultipleResultsFound
 
+
 class Harmonics(BaseModel):
     """Data containing the harmonics of the waveform, defined by a list of amplitudes and a list
     of frequencies
