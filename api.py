@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, AdvancedCoreMaterialsTable
+from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, AdvancedCoreMaterialsTable, WizardTelemetryTable
 from app.backend.models import BugReport
 from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,9 +16,9 @@ import pathlib
 import base64
 import kombu
 import celery
-from pylatex import Document, Command, Package
-from pylatex.utils import NoEscape
-import PyMKF
+# from pylatex import Document, Command, Package
+# from pylatex.utils import NoEscape
+import PyOpenMagnetics
 from OpenMagneticsVirtualBuilder.builder import Builder as ShapeBuilder  # noqa: E402
 import sys
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../MVB/src/OpenMagneticsVirtualBuilder')))
@@ -26,7 +26,7 @@ import sys
 import hashlib
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'app/backend')))
 from plotter import purge_queue
-from plotter import task_generate_core_3d_model, task_plot_core_and_fields, task_plot_core, task_plot_wire, task_plot_wire_and_current_density
+from plotter import task_generate_core_3d_model
 from plotter import task_generate_core_technical_drawing, task_generate_gapping_technical_drawing
 import ast
 import httpx
@@ -283,176 +283,36 @@ async def core_compute_gapping_technical_drawing(request: Request):
         return views
 
 
-@app.post("/process_latex", include_in_schema=True)
-async def process_latex(request: Request):
-    print(request)
-    print(dir(request))
-    tex = await request.body()
-    tex = tex.decode('utf-8')
-    filepath = "/opt/openmagnetics/latex"
-    pathlib.Path(filepath).mkdir(parents=True, exist_ok=True)
-    doc = Document(default_filepath=f"{filepath}/tex")
-    doc.packages.append(Package('array'))
-    doc.packages.append(Package('booktabs'))
-    doc.packages.append(Package('babel'))
-    doc.packages.append(Package('amsmath'))
-    doc.packages.append(Package('relsize'))
-    doc.packages.append(Package('cellspace'))
-    doc.packages.append(Package('tikz'))
-    doc.packages.append(Package('geometry'))
-    doc.packages.append(Package('fancyhdr'))
-    doc.preamble.append(Command('setlength\\cellspacetoplimit', '4pt'))
-    doc.preamble.append(Command('setlength\\cellspacebottomlimit', '4pt'))
-    doc.preamble.append(Command('usetikzlibrary', 'datavisualization'))
-    doc.preamble.append(Command('geometry', 'tmargin=1in'))
-    doc.preamble.append(Command('pagestyle', 'fancy'))
-    tex = tex.replace('μ', '$\\mu$')
-    doc.append(NoEscape(tex))
-    doc.generate_pdf(clean_tex=False)
-
-    with open(f"{filepath}/tex.pdf", "rb") as pdf_file:
-        pdf_string = base64.b64encode(pdf_file.read())
-        return pdf_string
-
-
-@app.post("/plot_core_and_fields", include_in_schema=True)
-async def plot_core_and_fields(request: Request):
-    data = await request.json()
-    number_retries = 5
-    plot = None
-
-    if not use_celery:
-        plot = task_plot_core_and_fields(data, temp_folder)
-    else:
-        try:
-            for retry in range(number_retries):
-                result = task_plot_core_and_fields.delay(data, temp_folder)
-                try:
-                    plot = result.get(timeout=10)
-                except celery.exceptions.TimeoutError:
-                    continue
-                except ConnectionResetError:
-                    continue
-                if plot is not None:
-                    break
-                print("Retrying plot_core_and_fields")
-            if plot is None:
-                purge_queue()
-        except kombu.exceptions.OperationalError:
-            plot = task_plot_core_and_fields(data, temp_folder)
-
-    if plot is None:
-        raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    if plot.endswith(".svg"):
-        return FileResponse(plot)
-    else:
-        return plot
-
-
-@app.post("/plot_core", include_in_schema=True)
-async def plot_core(request: Request):
-    data = await request.json()
-    number_retries = 5
-    plot = None
-
-    if not use_celery:
-        plot = task_plot_core(data, temp_folder)
-    else:
-        try:
-            for retry in range(number_retries):
-                result = task_plot_core.delay(data, temp_folder)
-                try:
-                    plot = result.get(timeout=10)
-                except celery.exceptions.TimeoutError:
-                    continue
-                except ConnectionResetError:
-                    continue
-                if plot is not None:
-                    break
-                print("Retrying task_plot_core")
-            if plot is None:
-                purge_queue()
-        except kombu.exceptions.OperationalError:
-            plot = task_plot_core(data, temp_folder)
-
-    if plot is None:
-        raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    if plot.endswith(".svg"):
-        return FileResponse(plot)
-    else:
-        return plot
-
-
-@app.post("/plot_wire", include_in_schema=True)
-async def plot_wire(request: Request):
-    data = await request.json()
-    number_retries = 5
-    plot = None
-
-    if not use_celery:
-        plot = task_plot_wire(data, temp_folder)
-    else:
-        try:
-            for retry in range(number_retries):
-                result = task_plot_wire.delay(data, temp_folder)
-                try:
-                    plot = result.get(timeout=10)
-                except celery.exceptions.TimeoutError:
-                    continue
-                except ConnectionResetError:
-                    continue
-                if plot is not None:
-                    break
-                print("Retrying task_plot_wire")
-            if plot is None:
-                purge_queue()
-        except kombu.exceptions.OperationalError:
-            plot = task_plot_wire(data, temp_folder)
-
-    if plot is None:
-        raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    if plot.endswith(".svg"):
-        return FileResponse(plot)
-    else:
-        return plot
-
-
-@app.post("/plot_wire_and_current_density", include_in_schema=True)
-async def plot_wire_and_current_density(request: Request):
-    data = await request.json()
-    number_retries = 5
-    plot = None
-
-    if not use_celery:
-        plot = task_plot_wire_and_current_density(data, temp_folder)
-    else:
-        try:
-            for retry in range(number_retries):
-                result = task_plot_wire_and_current_density.delay(data, temp_folder)
-                try:
-                    plot = result.get(timeout=10)
-                except celery.exceptions.TimeoutError:
-                    continue
-                except ConnectionResetError:
-                    continue
-                if plot is not None:
-                    break
-                print("Retrying task_plot_wire_and_current_density")
-            if plot is None:
-                purge_queue()
-        except kombu.exceptions.OperationalError:
-            plot = task_plot_wire_and_current_density(data, temp_folder)
-
-    if plot is None:
-        raise HTTPException(status_code=418, detail="Plotting timed out")
-
-    if plot.endswith(".svg"):
-        return FileResponse(plot)
-    else:
-        return plot
+# @app.post("/process_latex", include_in_schema=True)
+# async def process_latex(request: Request):
+#     print(request)
+#     print(dir(request))
+#     tex = await request.body()
+#     tex = tex.decode('utf-8')
+#     filepath = "/opt/openmagnetics/latex"
+#     pathlib.Path(filepath).mkdir(parents=True, exist_ok=True)
+#     doc = Document(default_filepath=f"{filepath}/tex")
+#     doc.packages.append(Package('array'))
+#     doc.packages.append(Package('booktabs'))
+#     doc.packages.append(Package('babel'))
+#     doc.packages.append(Package('amsmath'))
+#     doc.packages.append(Package('relsize'))
+#     doc.packages.append(Package('cellspace'))
+#     doc.packages.append(Package('tikz'))
+#     doc.packages.append(Package('geometry'))
+#     doc.packages.append(Package('fancyhdr'))
+#     doc.preamble.append(Command('setlength\\cellspacetoplimit', '4pt'))
+#     doc.preamble.append(Command('setlength\\cellspacebottomlimit', '4pt'))
+#     doc.preamble.append(Command('usetikzlibrary', 'datavisualization'))
+#     doc.preamble.append(Command('geometry', 'tmargin=1in'))
+#     doc.preamble.append(Command('pagestyle', 'fancy'))
+#     tex = tex.replace('μ', '$\\mu$')
+#     doc.append(NoEscape(tex))
+#     doc.generate_pdf(clean_tex=False)
+#
+#     with open(f"{filepath}/tex.pdf", "rb") as pdf_file:
+#         pdf_string = base64.b64encode(pdf_file.read())
+#         return pdf_string
 
 
 def insert_mas_background(data):
@@ -484,14 +344,34 @@ async def insert_intermediate_mas(request: Request, background_tasks: Background
         return "DB not available"
 
 
+def insert_wizard_telemetry_background(data):
+    table = WizardTelemetryTable()
+    table.insert_event(
+        wizard_type=data.get('wizard_type', ''),
+        trigger_action=data.get('trigger_action', ''),
+        mas_data=data.get('mas_data'),
+        username=data.get('username'),
+    )
+
+
+@app.post("/wizard_telemetry", include_in_schema=False)
+async def wizard_telemetry(request: Request, background_tasks: BackgroundTasks):
+    if use_db:
+        data = await request.json()
+        background_tasks.add_task(insert_wizard_telemetry_background, data)
+        return "Inserting in the background"
+    else:
+        return "DB not available"
+
+
 @app.post("/load_external_core_materials", include_in_schema=False)
 async def load_external_core_materials(request: Request, background_tasks: BackgroundTasks):
     data = await request.json()
 
     external_core_materials_string = data["coreMaterialsString"]
 
-    PyMKF.load_core_materials(external_core_materials_string)
-    PyMKF.load_core_materials("")
+    PyOpenMagnetics.load_core_materials(external_core_materials_string)
+    PyOpenMagnetics.load_core_materials("")
     return "Data loaded"
 
 

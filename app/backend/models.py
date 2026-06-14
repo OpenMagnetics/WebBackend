@@ -466,6 +466,45 @@ class IntermediateMasTable(Database):
         return mas_id
 
 
+class WizardTelemetryTable(Database):
+
+    def connect(self, schema='public'):
+        driver = "postgresql"
+        address = os.getenv('OM_DB_ADDRESS')
+        port = os.getenv('OM_DB_PORT')
+        name = os.getenv('OM_DB_NAME')
+        user = os.getenv('OM_DB_USER')
+        password = os.getenv('OM_DB_PASSWORD')
+
+        self.engine = sqlalchemy.create_engine(f"{driver}://{user}:{password}@{address}:{port}/{name}")
+
+        metadata = sqlalchemy.MetaData()
+        metadata.reflect(self.engine, schema=schema)
+        Base = automap_base(metadata=metadata)
+        Base.prepare()
+
+        Session = sqlalchemy.orm.sessionmaker(bind=self.engine)
+        self.session = Session()
+        self.Table = Base.classes.wizard_telemetry
+
+    def insert_event(self, wizard_type, trigger_action, mas_data, username=None):
+        self.connect()
+        data = {
+            'wizard_type': wizard_type,
+            'trigger_action': trigger_action,
+            'mas_data': json.dumps(mas_data),
+            'username': username,
+            'created_at': datetime.datetime.now(),
+        }
+        row = self.Table(**data)
+        self.session.add(row)
+        self.session.flush()
+        event_id = row.index
+        self.session.commit()
+        self.disconnect()
+        return event_id
+
+
 class AdvancedCoreMaterialsTable(Database):
 
     def connect(self, schema='public'):
