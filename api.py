@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, AdvancedCoreMaterialsTable, WizardTelemetryTable
+from app.backend.models import NotificationsTable, BugReportsTable, MasTable, IntermediateMasTable, AdvancedCoreMaterialsTable, TelemetryTable
 from app.backend.models import BugReport
 from app.backend.mas_models import MagneticCore, CoreShape, Magnetic, Inputs
 from fastapi.middleware.cors import CORSMiddleware
@@ -344,21 +344,35 @@ async def insert_intermediate_mas(request: Request, background_tasks: Background
         return "DB not available"
 
 
-def insert_wizard_telemetry_background(data):
-    table = WizardTelemetryTable()
-    table.insert_event(
-        wizard_type=data.get('wizard_type', ''),
-        trigger_action=data.get('trigger_action', ''),
+def insert_telemetry_background(data, environment):
+    table = TelemetryTable()
+    table.record(
+        session_id=data.get('session_id', 'unknown'),
+        event_type=data.get('event_type', ''),
+        source=data.get('source', ''),
+        stage=data.get('stage'),
+        environment=environment,
+        app_version=data.get('app_version'),
         mas_data=data.get('mas_data'),
-        username=data.get('username'),
+        topology=data.get('topology'),
+        mas_version=data.get('mas_version'),
+        result_count=data.get('result_count'),
+        error_message=data.get('error_message'),
     )
 
 
-@app.post("/wizard_telemetry", include_in_schema=False)
-async def wizard_telemetry(request: Request, background_tasks: BackgroundTasks):
+@app.post("/telemetry", include_in_schema=False)
+async def telemetry(request: Request, background_tasks: BackgroundTasks):
     if use_db:
         data = await request.json()
-        background_tasks.add_task(insert_wizard_telemetry_background, data)
+        # The frontend build declares its environment (VITE_ENV). Trust it when
+        # valid; otherwise fall back to the backend's own OM_ENV. Defaults to
+        # production only as a last resort so untagged rows never masquerade as
+        # development (which would hide them from production stats).
+        env = data.get('environment')
+        if env not in ('development', 'production'):
+            env = "development" if os.getenv("OM_ENV", "production") == "development" else "production"
+        background_tasks.add_task(insert_telemetry_background, data, env)
         return "Inserting in the background"
     else:
         return "DB not available"
