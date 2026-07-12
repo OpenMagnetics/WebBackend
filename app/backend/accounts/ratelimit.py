@@ -14,6 +14,13 @@ _lock = threading.Lock()
 _windows = {}  # (ip, tag) -> [window_start, count]
 
 
+def reset():
+    """Drop all counters. For tests (the suite registers many accounts from
+    one 'IP' in seconds); never called in production code paths."""
+    with _lock:
+        _windows.clear()
+
+
 def limit(tag: str, max_requests: int, per_seconds: int):
     """FastAPI dependency factory: 429 when the caller exceeds
     max_requests within per_seconds."""
