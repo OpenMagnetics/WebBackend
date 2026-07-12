@@ -11,3 +11,7 @@ pylatex
 OpenMagneticsVirtualBuilder
 fastapi[standard]
 celery
+alembic
+pwdlib[argon2]
+jsonschema
+referencing

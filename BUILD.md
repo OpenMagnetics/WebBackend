@@ -46,3 +46,21 @@ sudo chmod -R 777 /opt/openmagnetics
 
 venv/bin/python3.10 -m uvicorn api:app --host 0.0.0.0 --port 8000
 python3 -m celery -A plotter worker --loglevel=INFO
+## Accounts feature (Phase 1, 2026-07)
+
+Optional user accounts (cloud-saved designs, settings sync) live in
+`app/backend/accounts/`. Requirements on top of the base install:
+
+- Database schema is managed by Alembic: `alembic upgrade head`
+  (connection from the same `OM_DB_*` environment variables).
+- MAS validate-on-write needs the MAS and PEAS schema repos checked out
+  (defaults: `../MAS/schemas` and `~/PSMA/PEAS/schemas`; override with
+  `OM_MAS_SCHEMA_DIR` / `OM_PEAS_SCHEMA_DIR`).
+- Transactional email (verification, password reset) is SMTP via Mailtrap:
+  set `OM_SMTP_HOST`, `OM_SMTP_PORT`, `OM_SMTP_USER`, `OM_SMTP_PASSWORD`,
+  `OM_SMTP_FROM` (and `OM_PUBLIC_URL` for the links). Without them the
+  API runs fine but password reset returns 503.
+- Session cookie is `__Host-`-prefixed + Secure when `OM_ENV=production`
+  (requires HTTPS), plain `om_session` otherwise.
+
+Tests: `pytest tests/test_accounts.py` (hits the real DB, self-cleaning).

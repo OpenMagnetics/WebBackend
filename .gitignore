@@ -2,3 +2,6 @@
 *bootstrap-*
 *cache*
 *venv
+.venv/
+__pycache__/
+WebBackend2.7z
