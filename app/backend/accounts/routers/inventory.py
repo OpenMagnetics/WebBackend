@@ -21,7 +21,8 @@ from sqlalchemy.orm import Session as OrmSession
 
 from ..db import get_db
 from ..mas_validation import mas_spec_version, validate_mas_part
-from ..models import InventoryPart, User
+from ..models import InventoryPart, Membership, User
+from ..orgs import ROLE_RANK, membership_of, resolve_owner
 from ..security import current_user
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -55,6 +56,7 @@ class PartUpdateIn(BaseModel):
     stock_qty: float | None = None
     order_code: str | None = None
     notes: str | None = None
+    lifecycle: str | None = None     # org parts: librarian+ transitions
 
 
 def _payload(part: InventoryPart) -> dict:
@@ -68,6 +70,7 @@ def _payload(part: InventoryPart) -> dict:
         "stock_qty": float(part.stock_qty) if part.stock_qty is not None else None,
         "order_code": part.order_code,
         "notes": part.notes,
+        "lifecycle": part.lifecycle,
         "created_at": part.created_at.isoformat(),
         "updated_at": part.updated_at.isoformat(),
     }
@@ -94,9 +97,25 @@ def _validate_part_in(data: PartIn) -> tuple[str, list[str]]:
     raise HTTPException(status_code=422, detail="source must be 'catalog' or 'private'")
 
 
-def _own_parts(db: OrmSession, user: User):
-    return (db.query(InventoryPart)
-            .filter(InventoryPart.owner_user_id == user.id, InventoryPart.deleted_at.is_(None)))
+def _own_parts(db: OrmSession, user: User, owner_org_id=None):
+    owner_filter = (InventoryPart.owner_org_id == owner_org_id) if owner_org_id is not None \
+        else (InventoryPart.owner_user_id == user.id)
+    return db.query(InventoryPart).filter(owner_filter, InventoryPart.deleted_at.is_(None))
+
+
+def _write_access(db: OrmSession, user: User, part: InventoryPart, need_librarian: bool = False):
+    """Personal parts: free. Org parts: member+ edits metadata/drafts,
+    librarian+ for lifecycle transitions and approved-part edits."""
+    if part.owner_user_id == user.id:
+        return
+    if part.owner_org_id is not None:
+        membership = membership_of(db, user.id, part.owner_org_id)
+        minimum = "librarian" if need_librarian else "member"
+        if membership is not None and ROLE_RANK[membership.role] >= ROLE_RANK[minimum]:
+            return
+        if membership is not None:
+            raise HTTPException(status_code=403, detail=f"This action needs the '{minimum}' role or higher")
+    raise HTTPException(status_code=404, detail="Part not found")
 
 
 def _get_own_part(db: OrmSession, user: User, part_id: str) -> InventoryPart:
@@ -104,33 +123,49 @@ def _get_own_part(db: OrmSession, user: User, part_id: str) -> InventoryPart:
         key = uuid.UUID(part_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Part not found")
-    part = _own_parts(db, user).filter(InventoryPart.id == key).one_or_none()
+    part = (db.query(InventoryPart)
+            .filter(InventoryPart.id == key, InventoryPart.deleted_at.is_(None))
+            .one_or_none())
     if part is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+    if part.owner_user_id != user.id and (
+            part.owner_org_id is None or membership_of(db, user.id, part.owner_org_id) is None):
         raise HTTPException(status_code=404, detail="Part not found")
     return part
 
 
-def _check_quota(db: OrmSession, user: User, adding: int):
-    count = _own_parts(db, user).count()
+def _check_quota(db: OrmSession, user: User, adding: int, owner_org_id=None):
+    count = _own_parts(db, user, owner_org_id).count()
     if count + adding > MAX_PARTS_PER_OWNER:
         raise HTTPException(status_code=409,
                             detail=f"Inventory limit reached ({MAX_PARTS_PER_OWNER} parts)")
 
 
-def _upsert_part(db: OrmSession, user: User, data: PartIn) -> tuple[InventoryPart, list[str]]:
+def _upsert_part(db: OrmSession, user: User, data: PartIn,
+                 owner_user_id=None, owner_org_id=None, role=None) -> tuple[InventoryPart, list[str]]:
     name, schema_errors = _validate_part_in(data)
-    existing = (_own_parts(db, user)
+    if owner_user_id is None and owner_org_id is None:
+        owner_user_id = user.id
+    existing = (_own_parts(db, user, owner_org_id)
                 .filter(InventoryPart.part_type == data.part_type, InventoryPart.name == name)
                 .one_or_none())
     if existing is None:
-        _check_quota(db, user, adding=1)
+        _check_quota(db, user, adding=1, owner_org_id=owner_org_id)
+        # Personal parts skip the approval workflow; org parts start as
+        # drafts unless a librarian+ adds them (OrCAD temp-part pattern:
+        # members are never blocked, librarians promote later).
+        if owner_org_id is None or (role is not None and ROLE_RANK[role] >= ROLE_RANK["librarian"]):
+            lifecycle = "approved"
+        else:
+            lifecycle = "draft"
         existing = InventoryPart(
-            owner_user_id=user.id,
+            owner_user_id=owner_user_id,
+            owner_org_id=owner_org_id,
             part_type=data.part_type,
             name=name,
             source=data.source,
             created_by=user.id,
-            lifecycle="approved",     # personal parts skip the approval workflow
+            lifecycle=lifecycle,
         )
         db.add(existing)
     existing.source = data.source
@@ -145,14 +180,17 @@ def _upsert_part(db: OrmSession, user: User, data: PartIn) -> tuple[InventoryPar
 
 
 @router.get("")
-def list_parts(user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
-    parts = _own_parts(db, user).order_by(InventoryPart.part_type, InventoryPart.name).all()
+def list_parts(org: str | None = None, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    _, owner_org_id, _role = resolve_owner(db, user, org, minimum="viewer")
+    parts = _own_parts(db, user, owner_org_id).order_by(InventoryPart.part_type, InventoryPart.name).all()
     return {"parts": [_payload(p) for p in parts]}
 
 
 @router.post("")
-def create_part(data: PartIn, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
-    part, schema_errors = _upsert_part(db, user, data)
+def create_part(data: PartIn, org: str | None = None,
+                user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    owner_user_id, owner_org_id, role = resolve_owner(db, user, org, minimum="member")
+    part, schema_errors = _upsert_part(db, user, data, owner_user_id, owner_org_id, role)
     db.commit()
     db.refresh(part)
     payload = _payload(part)
@@ -164,7 +202,16 @@ def create_part(data: PartIn, user: User = Depends(current_user), db: OrmSession
 def update_part(part_id: str, data: PartUpdateIn,
                 user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
     part = _get_own_part(db, user, part_id)
+    # Editing an APPROVED org part or transitioning lifecycle needs librarian+;
+    # draft edits need member+.
+    need_librarian = data.lifecycle is not None or (
+        part.owner_org_id is not None and part.lifecycle == "approved" and data.mas is not None)
+    _write_access(db, user, part, need_librarian=need_librarian)
     schema_errors = []
+    if data.lifecycle is not None:
+        if data.lifecycle not in ("draft", "approved", "deprecated", "obsolete"):
+            raise HTTPException(status_code=422, detail="Unknown lifecycle state")
+        part.lifecycle = data.lifecycle
     if data.mas is not None:
         if part.source != "private":
             raise HTTPException(status_code=422, detail="Only private parts carry a MAS record")
@@ -188,14 +235,17 @@ def update_part(part_id: str, data: PartUpdateIn,
 @router.delete("/{part_id}")
 def delete_part(part_id: str, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
     part = _get_own_part(db, user, part_id)
+    _write_access(db, user, part, need_librarian=(part.owner_org_id is not None
+                                                  and part.lifecycle == "approved"))
     part.deleted_at = func.now()
     db.commit()
     return {"status": "deleted"}
 
 
 @router.post("/import")
-async def import_ndjson(request: Request, part_type: str,
+async def import_ndjson(request: Request, part_type: str, org: str | None = None,
                         user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    owner_user_id, owner_org_id, role = resolve_owner(db, user, org, minimum="member")
     """Bulk import: request body is MAS ndjson (one record per line), exactly
     the format Core Studio exports and the MAS data files use."""
     if part_type not in PART_TYPES:
@@ -206,7 +256,7 @@ async def import_ndjson(request: Request, part_type: str,
     lines = [line for line in body.decode("utf-8").splitlines() if line.strip()]
     if not lines:
         raise HTTPException(status_code=422, detail="Empty import")
-    _check_quota(db, user, adding=len(lines))
+    _check_quota(db, user, adding=len(lines), owner_org_id=owner_org_id)
 
     imported, errors = [], []
     for index, line in enumerate(lines, start=1):
@@ -217,7 +267,7 @@ async def import_ndjson(request: Request, part_type: str,
             continue
         data = PartIn(part_type=part_type, source="private", mas=record)
         try:
-            part, schema_errors = _upsert_part(db, user, data)
+            part, schema_errors = _upsert_part(db, user, data, owner_user_id, owner_org_id, role)
             imported.append({"name": part.name, "schema_errors": schema_errors})
         except HTTPException as error:
             errors.append(f"line {index}: {error.detail}")
@@ -226,10 +276,12 @@ async def import_ndjson(request: Request, part_type: str,
 
 
 @router.get("/export.ndjson", response_class=PlainTextResponse)
-def export_ndjson(part_type: str, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+def export_ndjson(part_type: str, org: str | None = None,
+                  user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
     if part_type not in PART_TYPES:
         raise HTTPException(status_code=422, detail=f"part_type must be one of {PART_TYPES}")
-    parts = (_own_parts(db, user)
+    _, owner_org_id, _role = resolve_owner(db, user, org, minimum="viewer")
+    parts = (_own_parts(db, user, owner_org_id)
              .filter(InventoryPart.part_type == part_type, InventoryPart.source == "private")
              .order_by(InventoryPart.name)
              .all())
@@ -248,6 +300,18 @@ def context_json(user: User = Depends(current_user), db: OrmSession = Depends(ge
     parts = list(_own_parts(db, user)
                  .filter(InventoryPart.lifecycle == "approved")
                  .all())
+    org_ids = [org_id for (org_id,) in
+               (db.query(Membership.org_id)
+                .filter(Membership.user_id == user.id,
+                        Membership.accepted_at.isnot(None),
+                        Membership.revoked_at.is_(None))
+                .all())]
+    if org_ids:
+        parts += (db.query(InventoryPart)
+                  .filter(InventoryPart.owner_org_id.in_(org_ids),
+                          InventoryPart.deleted_at.is_(None),
+                          InventoryPart.lifecycle == "approved")
+                  .all())
     mounted_owner_ids = [owner_id for (owner_id,) in
                          (db.query(ShareLink.owner_user_id)
                           .join(InventoryMount, InventoryMount.share_link_id == ShareLink.id)

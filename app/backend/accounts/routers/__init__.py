@@ -2,4 +2,5 @@ from .auth import router as auth_router              # noqa: F401
 from .designs import router as designs_router        # noqa: F401
 from .inventory import router as inventory_router    # noqa: F401
 from .me import router as me_router                  # noqa: F401
+from .organizations import router as orgs_router                  # noqa: F401
 from .shares import router as shares_router          # noqa: F401

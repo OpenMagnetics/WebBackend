@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session as OrmSession
 from ..db import get_db
 from ..mas_validation import mas_spec_version, validate_mas
 from ..models import Design, DesignRevision, User
+from ..orgs import membership_of, resolve_owner
 from ..security import current_user
 
 router = APIRouter(prefix="/designs", tags=["designs"])
@@ -75,17 +76,27 @@ def _envelope(design: Design, revisions: int | None = None) -> dict:
     return payload
 
 
-def _get_own_design(db: OrmSession, user: User, design_id: str) -> Design:
+def _get_own_design(db: OrmSession, user: User, design_id: str, write: bool = True) -> Design:
+    """A design the user may access: their own, or one owned by an org they
+    belong to (viewer may read; member+ may write)."""
     try:
         key = uuid.UUID(design_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Design not found")
     design = (db.query(Design)
-              .filter(Design.id == key, Design.owner_user_id == user.id, Design.deleted_at.is_(None))
+              .filter(Design.id == key, Design.deleted_at.is_(None))
               .one_or_none())
     if design is None:
         raise HTTPException(status_code=404, detail="Design not found")
-    return design
+    if design.owner_user_id == user.id:
+        return design
+    if design.owner_org_id is not None:
+        membership = membership_of(db, user.id, design.owner_org_id)
+        if membership is not None and (not write or membership.role != "viewer"):
+            return design
+        if membership is not None:
+            raise HTTPException(status_code=403, detail="Viewers cannot modify organization designs")
+    raise HTTPException(status_code=404, detail="Design not found")
 
 
 def _latest_revision(db: OrmSession, design: Design) -> DesignRevision:
@@ -99,10 +110,14 @@ def _latest_revision(db: OrmSession, design: Design) -> DesignRevision:
 
 
 @router.get("")
-def list_designs(user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+def list_designs(org: str | None = None,
+                 user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    owner_user_id, owner_org_id, _ = resolve_owner(db, user, org, minimum="viewer")
+    owner_filter = (Design.owner_user_id == owner_user_id) if owner_org_id is None \
+        else (Design.owner_org_id == owner_org_id)
     rows = (db.query(Design, func.count(DesignRevision.revision))
             .outerjoin(DesignRevision, DesignRevision.design_id == Design.id)
-            .filter(Design.owner_user_id == user.id, Design.deleted_at.is_(None))
+            .filter(owner_filter, Design.deleted_at.is_(None))
             .group_by(Design.id)
             .order_by(Design.updated_at.desc())
             .all())
@@ -116,12 +131,16 @@ def list_designs(user: User = Depends(current_user), db: OrmSession = Depends(ge
 
 
 @router.post("")
-def create_design(data: DesignIn, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+def create_design(data: DesignIn, org: str | None = None,
+                  user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    owner_user_id, owner_org_id, _ = resolve_owner(db, user, org, minimum="member")
     name = data.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="Design name must not be empty")
+    owner_filter = (Design.owner_user_id == owner_user_id) if owner_org_id is None \
+        else (Design.owner_org_id == owner_org_id)
     count = (db.query(func.count(Design.id))
-             .filter(Design.owner_user_id == user.id, Design.deleted_at.is_(None))
+             .filter(owner_filter, Design.deleted_at.is_(None))
              .scalar())
     if count >= MAX_DESIGNS_PER_USER:
         raise HTTPException(status_code=409, detail=f"Design limit reached ({MAX_DESIGNS_PER_USER}). Delete old designs first.")
@@ -129,7 +148,7 @@ def create_design(data: DesignIn, user: User = Depends(current_user), db: OrmSes
     mas_hash = _canonical_hash(data.mas)
     schema_errors = validate_mas(data.mas)
 
-    design = Design(owner_user_id=user.id, name=name, created_by=user.id, version=1)
+    design = Design(owner_user_id=owner_user_id, owner_org_id=owner_org_id, name=name, created_by=user.id, version=1)
     db.add(design)
     db.flush()
     db.add(DesignRevision(
@@ -152,7 +171,7 @@ def create_design(data: DesignIn, user: User = Depends(current_user), db: OrmSes
 
 @router.get("/{design_id}")
 def get_design(design_id: str, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
-    design = _get_own_design(db, user, design_id)
+    design = _get_own_design(db, user, design_id, write=False)
     revision = _latest_revision(db, design)
     payload = _envelope(design)
     payload.update({
@@ -231,7 +250,7 @@ def delete_design(design_id: str, user: User = Depends(current_user), db: OrmSes
 
 @router.get("/{design_id}/revisions")
 def list_revisions(design_id: str, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
-    design = _get_own_design(db, user, design_id)
+    design = _get_own_design(db, user, design_id, write=False)
     rows = (db.query(DesignRevision)
             .filter(DesignRevision.design_id == design.id)
             .order_by(DesignRevision.revision.desc())
@@ -247,7 +266,7 @@ def list_revisions(design_id: str, user: User = Depends(current_user), db: OrmSe
 @router.get("/{design_id}/revisions/{revision}")
 def get_revision(design_id: str, revision: int,
                  user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
-    design = _get_own_design(db, user, design_id)
+    design = _get_own_design(db, user, design_id, write=False)
     row = db.get(DesignRevision, (design.id, revision))
     if row is None:
         raise HTTPException(status_code=404, detail="Revision not found")
