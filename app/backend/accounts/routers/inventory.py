@@ -241,10 +241,26 @@ def context_json(user: User = Depends(current_user), db: OrmSession = Depends(ge
     """The engine-facing payload: private parts grouped by LibraryContext key,
     plus catalog references the frontend resolves against the embedded catalog.
     Only 'approved' parts are included (personal parts always are; the
-    lifecycle matters once org inventories arrive)."""
-    parts = (_own_parts(db, user)
-             .filter(InventoryPart.lifecycle == "approved")
-             .all())
+    lifecycle matters once org inventories arrive). Inventories the user has
+    MOUNTED via share links are folded in, so advisers can design with them."""
+    from ..models import InventoryMount, ShareLink
+
+    parts = list(_own_parts(db, user)
+                 .filter(InventoryPart.lifecycle == "approved")
+                 .all())
+    mounted_owner_ids = [owner_id for (owner_id,) in
+                         (db.query(ShareLink.owner_user_id)
+                          .join(InventoryMount, InventoryMount.share_link_id == ShareLink.id)
+                          .filter(InventoryMount.mounter_user_id == user.id,
+                                  InventoryMount.removed_at.is_(None),
+                                  ShareLink.revoked_at.is_(None))
+                          .all()) if owner_id is not None]
+    if mounted_owner_ids:
+        parts += (db.query(InventoryPart)
+                  .filter(InventoryPart.owner_user_id.in_(mounted_owner_ids),
+                          InventoryPart.deleted_at.is_(None),
+                          InventoryPart.lifecycle == "approved")
+                  .all())
     private = {key: [] for key in CONTEXT_KEYS.values()}
     catalog_refs = {key: [] for key in CONTEXT_KEYS.values()}
     for part in parts:
