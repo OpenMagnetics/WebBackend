@@ -1,11 +1,8 @@
 sqlalchemy
-pandas
 numpy
 pydantic
 supervisor
 fastapi
-bcrypt
-pymongo[srv]
 psycopg2-binary
 uvicorn
 circus
