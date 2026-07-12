@@ -50,7 +50,7 @@ def _peas_schema_dir() -> pathlib.Path:
 
 
 @functools.lru_cache(maxsize=1)
-def _validator() -> Draft202012Validator:
+def _registry_and_root():
     schema_dir = _schema_dir()
     resources = []
     root_schema = None
@@ -66,7 +66,12 @@ def _validator() -> Draft202012Validator:
                 root_schema = schema
     if root_schema is None:
         raise RuntimeError(f"MAS.json not found in {schema_dir}")
-    registry = Registry().with_resources(resources)
+    return Registry().with_resources(resources), root_schema
+
+
+@functools.lru_cache(maxsize=1)
+def _validator() -> Draft202012Validator:
+    registry, root_schema = _registry_and_root()
     return Draft202012Validator(root_schema, registry=registry)
 
 
@@ -85,8 +90,37 @@ def mas_spec_version() -> str:
 
 def validate_mas(document) -> list[str]:
     """Return a list of human-readable validation errors (empty = valid)."""
+    return _collect_errors(_validator(), document)
+
+
+# inventory part_type -> the MAS sub-schema its ndjson records conform to
+_PART_SCHEMA_IDS = {
+    "coreShape": "https://psma.com/mas/magnetic/core/shape.json",
+    "coreMaterial": "https://psma.com/mas/magnetic/core/material.json",
+    "core": "https://psma.com/mas/magnetic/core.json",
+    "bobbin": "https://psma.com/mas/magnetic/bobbin.json",
+    "wire": "https://psma.com/mas/magnetic/wire.json",
+}
+
+
+@functools.lru_cache(maxsize=8)
+def _part_validator(part_type: str) -> Draft202012Validator:
+    if part_type not in _PART_SCHEMA_IDS:
+        raise RuntimeError(f"No MAS sub-schema mapping for part_type {part_type!r}")
+    registry, _ = _registry_and_root()
+    schema = registry.contents(_PART_SCHEMA_IDS[part_type])
+    return Draft202012Validator(schema, registry=registry)
+
+
+def validate_mas_part(part_type: str, record) -> list[str]:
+    """Validate one catalog-part record (one ndjson line) against its MAS
+    sub-schema. Returns human-readable errors (empty = valid)."""
+    return _collect_errors(_part_validator(part_type), record)
+
+
+def _collect_errors(validator: Draft202012Validator, document) -> list[str]:
     errors = []
-    for error in sorted(_validator().iter_errors(document), key=lambda e: list(e.absolute_path)):
+    for error in sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path)):
         location = "/".join(str(p) for p in error.absolute_path) or "(root)"
         errors.append(f"{location}: {error.message}")
         if len(errors) >= 20:

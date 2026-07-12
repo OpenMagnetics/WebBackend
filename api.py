@@ -23,7 +23,7 @@ use_celery = ast.literal_eval(os.getenv('USE_CELERY', "True"))
 use_db = "OM_DB_ADDRESS" in os.environ
 
 
-from app.backend.accounts.routers import auth_router, designs_router, me_router
+from app.backend.accounts.routers import auth_router, designs_router, inventory_router, me_router
 
 app = FastAPI()
 
@@ -43,6 +43,7 @@ async def reject_oversized_bodies(request: Request, call_next):
 
 app.include_router(auth_router)
 app.include_router(designs_router)
+app.include_router(inventory_router)
 app.include_router(me_router)
 
 origins = [

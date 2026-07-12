@@ -1,0 +1,259 @@
+"""Personal parts inventory: the approved-parts list the advisers can scope to.
+
+Each row is one part owned by the user (org ownership arrives in Phase 4):
+- source='catalog': a reference by MAS name to a public catalog part.
+- source='private': a full MAS record (validated like designs — stored either
+  way but quarantined with schema_valid semantics via the mas_valid flag in
+  responses; adviser payloads only include clean parts).
+
+Endpoints mirror the MAS ndjson data-file format for bulk import/export, and
+/inventory/context.json returns the LibraryContext payload the frontend feeds
+to library_context_load() / the load_* engine loaders.
+"""
+import json
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session as OrmSession
+
+from ..db import get_db
+from ..mas_validation import mas_spec_version, validate_mas_part
+from ..models import InventoryPart, User
+from ..security import current_user
+
+router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+PART_TYPES = ("coreShape", "coreMaterial", "core", "bobbin", "wire")
+# inventory_parts.part_type -> LibraryContext key (libMKF library_context_load)
+CONTEXT_KEYS = {
+    "coreShape": "coreShapes",
+    "coreMaterial": "coreMaterials",
+    "core": "cores",
+    "bobbin": "bobbins",
+    "wire": "wires",
+}
+MAX_PARTS_PER_OWNER = 1000
+MAX_IMPORT_BYTES = 10 * 1024 * 1024
+
+
+class PartIn(BaseModel):
+    part_type: str
+    name: str | None = None          # required for source='catalog'; derived from mas otherwise
+    source: str
+    catalog_ref: str | None = None
+    mas: dict | None = None
+    stock_qty: float | None = None
+    order_code: str | None = None
+    notes: str | None = None
+
+
+class PartUpdateIn(BaseModel):
+    mas: dict | None = None
+    stock_qty: float | None = None
+    order_code: str | None = None
+    notes: str | None = None
+
+
+def _payload(part: InventoryPart) -> dict:
+    return {
+        "id": str(part.id),
+        "part_type": part.part_type,
+        "name": part.name,
+        "source": part.source,
+        "catalog_ref": part.catalog_ref,
+        "mas": part.mas,
+        "stock_qty": float(part.stock_qty) if part.stock_qty is not None else None,
+        "order_code": part.order_code,
+        "notes": part.notes,
+        "created_at": part.created_at.isoformat(),
+        "updated_at": part.updated_at.isoformat(),
+    }
+
+
+def _validate_part_in(data: PartIn) -> tuple[str, list[str]]:
+    """Returns (name, schema_errors). Raises 422 on structural nonsense."""
+    if data.part_type not in PART_TYPES:
+        raise HTTPException(status_code=422, detail=f"part_type must be one of {PART_TYPES}")
+    if data.source == "catalog":
+        name = (data.catalog_ref or data.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="A catalog part needs catalog_ref (the public part name)")
+        if data.mas is not None:
+            raise HTTPException(status_code=422, detail="A catalog part must not carry a mas document")
+        return name, []
+    if data.source == "private":
+        if data.mas is None:
+            raise HTTPException(status_code=422, detail="A private part needs its full MAS record in 'mas'")
+        name = str(data.mas.get("name") or data.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="The MAS record has no 'name'")
+        return name, validate_mas_part(data.part_type, data.mas)
+    raise HTTPException(status_code=422, detail="source must be 'catalog' or 'private'")
+
+
+def _own_parts(db: OrmSession, user: User):
+    return (db.query(InventoryPart)
+            .filter(InventoryPart.owner_user_id == user.id, InventoryPart.deleted_at.is_(None)))
+
+
+def _get_own_part(db: OrmSession, user: User, part_id: str) -> InventoryPart:
+    try:
+        key = uuid.UUID(part_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Part not found")
+    part = _own_parts(db, user).filter(InventoryPart.id == key).one_or_none()
+    if part is None:
+        raise HTTPException(status_code=404, detail="Part not found")
+    return part
+
+
+def _check_quota(db: OrmSession, user: User, adding: int):
+    count = _own_parts(db, user).count()
+    if count + adding > MAX_PARTS_PER_OWNER:
+        raise HTTPException(status_code=409,
+                            detail=f"Inventory limit reached ({MAX_PARTS_PER_OWNER} parts)")
+
+
+def _upsert_part(db: OrmSession, user: User, data: PartIn) -> tuple[InventoryPart, list[str]]:
+    name, schema_errors = _validate_part_in(data)
+    existing = (_own_parts(db, user)
+                .filter(InventoryPart.part_type == data.part_type, InventoryPart.name == name)
+                .one_or_none())
+    if existing is None:
+        _check_quota(db, user, adding=1)
+        existing = InventoryPart(
+            owner_user_id=user.id,
+            part_type=data.part_type,
+            name=name,
+            source=data.source,
+            created_by=user.id,
+            lifecycle="approved",     # personal parts skip the approval workflow
+        )
+        db.add(existing)
+    existing.source = data.source
+    existing.catalog_ref = name if data.source == "catalog" else None
+    existing.mas = data.mas
+    existing.mas_version = mas_spec_version() if data.source == "private" else None
+    existing.stock_qty = data.stock_qty
+    existing.order_code = data.order_code
+    existing.notes = data.notes
+    existing.updated_at = func.now()
+    return existing, schema_errors
+
+
+@router.get("")
+def list_parts(user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    parts = _own_parts(db, user).order_by(InventoryPart.part_type, InventoryPart.name).all()
+    return {"parts": [_payload(p) for p in parts]}
+
+
+@router.post("")
+def create_part(data: PartIn, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    part, schema_errors = _upsert_part(db, user, data)
+    db.commit()
+    db.refresh(part)
+    payload = _payload(part)
+    payload["schema_errors"] = schema_errors
+    return payload
+
+
+@router.patch("/{part_id}")
+def update_part(part_id: str, data: PartUpdateIn,
+                user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    part = _get_own_part(db, user, part_id)
+    schema_errors = []
+    if data.mas is not None:
+        if part.source != "private":
+            raise HTTPException(status_code=422, detail="Only private parts carry a MAS record")
+        schema_errors = validate_mas_part(part.part_type, data.mas)
+        part.mas = data.mas
+        part.mas_version = mas_spec_version()
+    if data.stock_qty is not None:
+        part.stock_qty = data.stock_qty
+    if data.order_code is not None:
+        part.order_code = data.order_code
+    if data.notes is not None:
+        part.notes = data.notes
+    part.updated_at = func.now()
+    db.commit()
+    db.refresh(part)
+    payload = _payload(part)
+    payload["schema_errors"] = schema_errors
+    return payload
+
+
+@router.delete("/{part_id}")
+def delete_part(part_id: str, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    part = _get_own_part(db, user, part_id)
+    part.deleted_at = func.now()
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.post("/import")
+async def import_ndjson(request: Request, part_type: str,
+                        user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    """Bulk import: request body is MAS ndjson (one record per line), exactly
+    the format Core Studio exports and the MAS data files use."""
+    if part_type not in PART_TYPES:
+        raise HTTPException(status_code=422, detail=f"part_type must be one of {PART_TYPES}")
+    body = await request.body()
+    if len(body) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="Import exceeds the 10 MB limit")
+    lines = [line for line in body.decode("utf-8").splitlines() if line.strip()]
+    if not lines:
+        raise HTTPException(status_code=422, detail="Empty import")
+    _check_quota(db, user, adding=len(lines))
+
+    imported, errors = [], []
+    for index, line in enumerate(lines, start=1):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            errors.append(f"line {index}: not valid JSON ({error})")
+            continue
+        data = PartIn(part_type=part_type, source="private", mas=record)
+        try:
+            part, schema_errors = _upsert_part(db, user, data)
+            imported.append({"name": part.name, "schema_errors": schema_errors})
+        except HTTPException as error:
+            errors.append(f"line {index}: {error.detail}")
+    db.commit()
+    return {"imported": imported, "errors": errors}
+
+
+@router.get("/export.ndjson", response_class=PlainTextResponse)
+def export_ndjson(part_type: str, user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    if part_type not in PART_TYPES:
+        raise HTTPException(status_code=422, detail=f"part_type must be one of {PART_TYPES}")
+    parts = (_own_parts(db, user)
+             .filter(InventoryPart.part_type == part_type, InventoryPart.source == "private")
+             .order_by(InventoryPart.name)
+             .all())
+    return "\n".join(json.dumps(p.mas) for p in parts if p.mas is not None)
+
+
+@router.get("/context.json")
+def context_json(user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
+    """The engine-facing payload: private parts grouped by LibraryContext key,
+    plus catalog references the frontend resolves against the embedded catalog.
+    Only 'approved' parts are included (personal parts always are; the
+    lifecycle matters once org inventories arrive)."""
+    parts = (_own_parts(db, user)
+             .filter(InventoryPart.lifecycle == "approved")
+             .all())
+    private = {key: [] for key in CONTEXT_KEYS.values()}
+    catalog_refs = {key: [] for key in CONTEXT_KEYS.values()}
+    for part in parts:
+        key = CONTEXT_KEYS[part.part_type]
+        if part.source == "private" and part.mas is not None:
+            private[key].append(part.mas)
+        elif part.source == "catalog":
+            catalog_refs[key].append(part.catalog_ref)
+    return {
+        "context": {key: records for key, records in private.items() if records},
+        "catalogRefs": {key: names for key, names in catalog_refs.items() if names},
+    }
