@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session as OrmSession
 from .. import emailer
 from ..db import get_db
 from ..models import EmailToken, User
+from ..ratelimit import limit
 from ..security import (
     clear_session_cookie, create_session, current_user, destroy_other_sessions,
     destroy_session, hash_password, set_session_cookie, verify_password,
@@ -108,13 +109,13 @@ def _consume_email_token(db: OrmSession, token: str, purpose: str) -> User:
     return user
 
 
-@router.post("/check_email")
+@router.post("/check_email", dependencies=[Depends(limit("check_email", 30, 60))])
 def check_email(data: EmailIn, db: OrmSession = Depends(get_db)):
     email = _normalize_email(data.email)
     return {"exists": _find_user(db, email) is not None}
 
 
-@router.post("/register")
+@router.post("/register", dependencies=[Depends(limit("register", 10, 3600))])
 def register(data: RegisterIn, request: Request, response: Response,
              background_tasks: BackgroundTasks, db: OrmSession = Depends(get_db)):
     email = _normalize_email(data.email)
@@ -140,7 +141,7 @@ def register(data: RegisterIn, request: Request, response: Response,
     return _user_payload(user)
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(limit("login", 15, 300))])
 def login(data: LoginIn, request: Request, response: Response, db: OrmSession = Depends(get_db)):
     email = _normalize_email(data.email)
     user = _find_user(db, email)
@@ -176,7 +177,7 @@ def change_password(data: ChangePasswordIn, request: Request,
     return {"status": "password_changed"}
 
 
-@router.post("/request_verify")
+@router.post("/request_verify", dependencies=[Depends(limit("send_email", 5, 3600))])
 def request_verify(background_tasks: BackgroundTasks,
                    user: User = Depends(current_user), db: OrmSession = Depends(get_db)):
     if user.email_verified_at is not None:
@@ -201,7 +202,7 @@ def verify_email(data: VerifyIn, db: OrmSession = Depends(get_db)):
     return {"status": "verified"}
 
 
-@router.post("/request_password_reset")
+@router.post("/request_password_reset", dependencies=[Depends(limit("send_email", 5, 3600))])
 def request_password_reset(data: EmailIn, background_tasks: BackgroundTasks,
                            db: OrmSession = Depends(get_db)):
     if not emailer.smtp_configured():
@@ -216,7 +217,7 @@ def request_password_reset(data: EmailIn, background_tasks: BackgroundTasks,
     return {"status": "reset_email_sent_if_account_exists"}
 
 
-@router.post("/reset_password")
+@router.post("/reset_password", dependencies=[Depends(limit("reset_password", 10, 3600))])
 def reset_password(data: ResetPasswordIn, db: OrmSession = Depends(get_db)):
     _check_password_strength(data.new_password)
     user = _consume_email_token(db, data.token, "reset")

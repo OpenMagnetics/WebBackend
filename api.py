@@ -27,6 +27,20 @@ from app.backend.accounts.routers import auth_router, designs_router, me_router
 
 app = FastAPI()
 
+# uvicorn serves this API directly (no nginx in front), so the request-size
+# cap lives here. 10 MB comfortably covers the largest observed MAS payloads
+# (~1.5 MB) and the future ndjson inventory imports.
+MAX_BODY_BYTES = 10 * 1024 * 1024
+
+
+@app.middleware("http")
+async def reject_oversized_bodies(request: Request, call_next):
+    content_length = request.headers.get("content-length")
+    if content_length is not None and content_length.isdigit() and int(content_length) > MAX_BODY_BYTES:
+        return Response(status_code=413, content="Request body too large")
+    return await call_next(request)
+
+
 app.include_router(auth_router)
 app.include_router(designs_router)
 app.include_router(me_router)
