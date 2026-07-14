@@ -16,6 +16,19 @@ from plotter import task_generate_core_3d_model
 from plotter import task_generate_core_technical_drawing, task_generate_gapping_technical_drawing
 import ast
 import httpx
+import base64
+import shutil
+import subprocess
+import tempfile
+from pylatex import Document, Command, Package
+from pylatex.utils import NoEscape
+
+# Global LaTeX file-IO sandbox: paranoid mode forbids pdflatex \input/\write
+# from touching absolute or parent-directory paths, so a client-supplied
+# document can only read/write inside its own per-request temp dir. Set once,
+# process-wide (a security policy, not per-request state).
+os.environ.setdefault("openin_any", "p")
+os.environ.setdefault("openout_any", "p")
 
 temp_folder = "/opt/openmagnetics/temp"
 high_performance_backend_url = "http://86.127.248.99:8001"
@@ -300,3 +313,55 @@ async def is_high_performance_backend_available():
             return True
     except Exception:
         return False
+
+
+@app.post("/process_latex", include_in_schema=False)
+async def process_latex(request: Request):
+    # Render a client-supplied LaTeX body to a PDF and return it base64-encoded
+    # (a JSON string, matching the frontend downloadBase64asPDF contract). The
+    # frontend sends the document BODY only; the pylatex preamble below wraps it.
+    #
+    # SECURITY: the body is arbitrary user LaTeX, so compilation is sandboxed —
+    # a fresh per-request temp dir (concurrent requests never collide), pdflatex
+    # with -no-shell-escape (no \write18 shell execution), and the process-wide
+    # openin_any/openout_any=p set at import time (\input/\write cannot escape
+    # the temp dir). The 10 MB body cap (middleware above) bounds the input.
+    tex = (await request.body()).decode("utf-8")
+    tex = tex.replace("μ", "$\\mu$")
+
+    workdir = tempfile.mkdtemp(prefix="om_latex_")
+    try:
+        doc = Document(default_filepath=os.path.join(workdir, "tex"))
+        for package in ("array", "booktabs", "babel", "amsmath", "relsize",
+                        "cellspace", "tikz", "geometry", "fancyhdr"):
+            doc.packages.append(Package(package))
+        doc.preamble.append(Command("setlength\\cellspacetoplimit", "4pt"))
+        doc.preamble.append(Command("setlength\\cellspacebottomlimit", "4pt"))
+        doc.preamble.append(Command("usetikzlibrary", "datavisualization"))
+        doc.preamble.append(Command("geometry", "tmargin=1in"))
+        doc.preamble.append(Command("pagestyle", "fancy"))
+        doc.append(NoEscape(tex))
+
+        # Write the wrapped .tex, then compile it OURSELVES with cwd=workdir and
+        # a RELATIVE filename. openin_any=p (paranoid) refuses absolute paths, so
+        # pylatex's own generate_pdf (which passes an absolute path) would be
+        # blocked — but a relative name in cwd compiles fine while paranoid mode
+        # still blocks absolute/parent \input (e.g. \input{/etc/passwd}). timeout
+        # caps a malicious non-terminating document.
+        doc.generate_tex(os.path.join(workdir, "tex"))
+        try:
+            result = subprocess.run(
+                ["pdflatex", "-no-shell-escape", "-interaction=nonstopmode",
+                 "-halt-on-error", "tex.tex"],
+                cwd=workdir, capture_output=True, text=True, timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            raise HTTPException(status_code=422, detail="LaTeX compilation timed out")
+
+        pdf_path = os.path.join(workdir, "tex.pdf")
+        if result.returncode != 0 or not os.path.exists(pdf_path):
+            raise HTTPException(status_code=422, detail="LaTeX compilation failed")
+        with open(pdf_path, "rb") as pdf_file:
+            return base64.b64encode(pdf_file.read()).decode("ascii")
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
