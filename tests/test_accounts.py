@@ -183,7 +183,58 @@ def test_settings_roundtrip(client, account):
     payload = {"adviserSettings": {"useOnlyCoresInStock": True}, "theme": "dark"}
     response = client.put("/me/settings", json={"settings": payload})
     assert response.status_code == 200 and response.json()["settings"] == payload
-    assert client.get("/me/settings").json()["settings"] == payload
+    # Whole-document writes are read back as a version-2 document: the legacy
+    # blob becomes the single "settings" section (see test_settings_legacy_...).
+    stored = client.get("/me/settings").json()["settings"]
+    assert stored["version"] == 2
+    assert stored["sections"]["settings"]["values"] == payload
+
+
+def test_settings_sections_merge_per_section(client, account):
+    # A version-2 document grows one section at a time; an older edit to a
+    # section is refused with the stored copy, a different section is untouched.
+    r = client.patch("/me/settings/sections/settings",
+                     json={"values": {"adviserSettings": {"maximumTemperature": 99}}, "updatedAt": "2026-09-05T10:00:00.000Z"})
+    assert r.status_code == 200, r.text
+    r = client.patch("/me/settings/sections/models",
+                     json={"values": {"selectedModels": {"coreLosses": "IGSE"}}, "updatedAt": "2026-09-05T10:05:00.000Z"})
+    assert r.status_code == 200, r.text
+    doc = client.get("/me/settings").json()["settings"]
+    assert doc["version"] == 2 and set(doc["sections"]) == {"settings", "models"}
+    assert doc["sections"]["settings"]["values"]["adviserSettings"]["maximumTemperature"] == 99
+
+    stale = client.patch("/me/settings/sections/settings",
+                         json={"values": {"adviserSettings": {"maximumTemperature": 50}}, "updatedAt": "2026-09-05T09:00:00.000Z"})
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["section"]["values"]["adviserSettings"]["maximumTemperature"] == 99
+
+    newer = client.patch("/me/settings/sections/settings",
+                         json={"values": {"adviserSettings": {"maximumTemperature": 120}}, "updatedAt": "2026-09-05T11:00:00.000Z"})
+    assert newer.status_code == 200
+    doc = client.get("/me/settings").json()["settings"]
+    assert doc["sections"]["settings"]["values"]["adviserSettings"]["maximumTemperature"] == 120
+    assert doc["sections"]["models"]["values"]["selectedModels"]["coreLosses"] == "IGSE"
+
+    assert client.patch("/me/settings/sections/bad name", json={"values": {}, "updatedAt": "x"}).status_code == 422
+
+
+def test_settings_legacy_document_is_read_as_one_section(client, account):
+    # A pre-sections document (the whole settings store) is served as a single
+    # "settings" section stamped with the row's updated_at, and a section
+    # patch upgrades the document in place.
+    legacy = {"adviserSettings": {"useOnlyCoresInStock": True}, "loadingGif": "/images/loading.gif"}
+    assert client.put("/me/settings", json={"settings": legacy}).status_code == 200
+    doc = client.get("/me/settings").json()["settings"]
+    assert doc["version"] == 2 and list(doc["sections"]) == ["settings"]
+    assert doc["sections"]["settings"]["values"] == legacy
+    assert doc["sections"]["settings"]["updatedAt"]
+
+    r = client.patch("/me/settings/sections/magneticBuilder",
+                     json={"values": {"enableGraphs": True}, "updatedAt": "2099-01-01T00:00:00.000Z"})
+    assert r.status_code == 200
+    doc = client.get("/me/settings").json()["settings"]
+    assert set(doc["sections"]) == {"settings", "magneticBuilder"}
+    assert doc["sections"]["settings"]["values"] == legacy
 
 
 def test_change_password_invalidates_other_sessions(client, account):
