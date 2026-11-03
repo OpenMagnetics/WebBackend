@@ -1,8 +1,10 @@
 """Minimal in-process rate limiting for the sensitive auth endpoints.
 
 Fixed-window counters per (client IP, route tag), no external dependencies.
-The API is served by uvicorn directly (no nginx in front), so request.client
-is the real peer address. Limits reset on process restart — acceptable for
+The web app reaches the API through nginx (openmagnetics.com/api/ ->
+uvicorn :4241), which SETS X-Forwarded-For to the peer address; uvicorn trusts
+that header from 127.0.0.1 (its default), so request.client is the real
+client either way. Direct calls to :4241 are also still accepted. Limits reset on process restart — acceptable for
 abuse damping (this is not billing-grade accounting).
 """
 import threading
