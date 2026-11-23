@@ -27,7 +27,7 @@ from ..security import current_user
 
 router = APIRouter(prefix="/designs", tags=["designs"])
 
-MAX_DESIGNS_PER_USER = 100
+MAX_DESIGNS_PER_USER = 10000
 MAX_REVISIONS_PER_DESIGN = 50
 MAX_DESIGN_BYTES = 2 * 1024 * 1024
 
